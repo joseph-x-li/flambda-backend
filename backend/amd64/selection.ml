@@ -107,7 +107,8 @@ let pseudoregs_for_operation op arg res =
   | Ispecific (Ibswap _) -> assert false
   | Iintop(Imulh) ->
       ([| rax; arg.(1) |], [| rdx |])
-  | Ispecific(Ifloatarithmem(_,_)) ->
+  | Ispecific(Ifloatarithmem(_,_)) | Ispecific (Iintarithmem(_, _))
+    ->
       let arg' = Array.copy arg in
       arg'.(0) <- res.(0);
       (arg', res)
@@ -249,10 +250,38 @@ method! select_operation op args dbg =
   (* Recognize the LEA instruction *)
     Caddi | Caddv | Cadda | Csubi ->
       begin match self#select_addressing Word_int (Cop(op, args, dbg)) with
-        (Iindexed _, _)
-      | (Iindexed2 0, _) -> super#select_operation op args dbg
+      | (Iindexed _, _) | (Iindexed2 0, _) ->
+          begin
+            match op  with
+            | Caddi | Caddv | Cadda -> self#select_intarith op Iintadd true args dbg
+            | Csubi -> self#select_intarith op Iintsub false args dbg
+            | _ -> assert false
+          end
       | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr,
          arg) -> (Ispecific(Ilea addr), [arg])
+      end
+  (* Recognize int arithmetic with memory.*)
+  | Cmuli -> self#select_intarith op Iintmul true args dbg
+  | Cand ->
+    begin match args with
+    (* Recognize zero extension *)
+    | [arg; Cconst_int (0xffff_ffff, _)]
+    | [arg; Cconst_natint (0xffff_ffffn, _)]
+    | [Cconst_int (0xffff_ffff, _); arg]
+    | [Cconst_natint (0xffff_ffffn, _); arg] ->
+      Ispecific Izextend32, [arg]
+    | _ -> self#select_intarith op Iintand true args dbg
+    end
+  | Cor -> self#select_intarith op Iintor true args dbg
+  | Cxor -> self#select_intarith op Iintxor true args dbg
+  | Clsl -> self#select_intarith op Iintlsl false args dbg
+  | Clsr -> self#select_intarith op Iintlsr false args dbg
+  | Casr ->
+      begin match args with
+      (* Recognize sign extension *)
+        [Cop(Clsl, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
+          (Ispecific Isextend32, [k])
+      | _ -> self#select_intarith op Iintasr false args dbg
       end
   (* Recognize float arithmetic with memory. *)
   | Caddf ->
@@ -372,6 +401,21 @@ method select_floatarith commutative regular_op mem_op args =
                  [arg2; arg1])
   | [arg1; arg2] ->
       (regular_op, [arg1; arg2])
+  | _ ->
+      assert false
+
+method select_intarith regular_op (mem_op : Arch.int_operation) commutative args dbg =
+  match args with
+  | [arg1; Cop(Cload ((Word_int as chunk), _), [loc2], _)] ->
+      let (addr, arg2) = self#select_addressing chunk loc2 in
+      (Ispecific(Iintarithmem(mem_op, addr)), [arg1; arg2])
+  | [Cop(Cload ((Word_int as chunk), Asttypes.Mutable), [loc1], _); arg2] when
+      commutative
+       ->
+      let (addr, arg1) = self#select_addressing chunk loc1 in
+      (Ispecific(Iintarithmem(mem_op, addr)), [arg2; arg1])
+  | [_; _] ->
+      super#select_operation regular_op args dbg
   | _ ->
       assert false
 

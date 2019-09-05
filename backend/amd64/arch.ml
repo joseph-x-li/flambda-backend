@@ -82,6 +82,9 @@ type specific_operation =
   | Ioffset_loc of int * addressing_mode (* Add a constant to a location *)
   | Ifloatarithmem of float_operation * addressing_mode
                                        (* Float arith operation with memory *)
+  | Iintarithmem of int_operation * addressing_mode
+                                       (* Int arithmetic operation with memory.
+                                          Currently only loads are supported.*)
   | Ibswap of int                      (* endianness conversion *)
   | Isqrtf                             (* Float square root *)
   | Ifloatsqrtf of addressing_mode     (* Float square root from memory *)
@@ -106,6 +109,17 @@ type specific_operation =
 
 and float_operation =
     Ifloatadd | Ifloatsub | Ifloatmul | Ifloatdiv
+
+and int_operation =
+    Iintadd
+  | Iintsub
+  | Iintmul
+  | Iintand
+  | Iintor
+  | Iintxor
+  | Iintlsl
+  | Iintlsr
+  | Iintasr
 
 (* Sizes, endianness *)
 
@@ -203,6 +217,22 @@ let print_specific_operation printreg op ppf arg =
       fprintf ppf "%a %s float64[%a]" printreg arg.(0) (op_name op)
                    (print_addressing printreg addr)
                    (Array.sub arg 1 (Array.length arg - 1))
+  | Iintarithmem(op, addr) ->
+      let op_name = function
+        | Iintadd -> "+"
+        | Iintsub -> "-"
+        | Iintmul -> "*"
+        | Iintand -> "&"
+        | Iintor -> "|"
+        | Iintxor -> "^"
+        | Iintlsl -> "<<"
+        | Iintlsr -> ">>u"
+        | Iintasr -> ">>s"
+      in
+      fprintf ppf "%a %s int[%a]" printreg arg.(0)
+        (op_name op)
+        (print_addressing printreg addr)
+        (Array.sub arg 1 (Array.length arg - 1))
   | Ibswap i ->
       fprintf ppf "bswap_%i %a" i printreg arg.(0)
   | Isextend32 ->

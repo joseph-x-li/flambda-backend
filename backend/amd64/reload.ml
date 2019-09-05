@@ -49,6 +49,7 @@ open Mach
      Iintoffloat                R       S
      Ispecific(Ilea)            R       R       R
      Ispecific(Ifloatarithmem)  R       R       R
+     Ispecific(Iintarithmem)    R       R
      Ispecific(Icrc32q)         R       R       S   (and Res = Arg1)
      Ispecific(Irdtsc)          R
      Ispecific(Irdpmc)          R       R           (Arg1 = rcx)
@@ -143,6 +144,7 @@ method! reload_operation op arg res =
                | Istore_int (_, _, _)
                | Ioffset_loc (_, _) | Ifloatarithmem (_, _)
                | Iprefetch _
+               | Iintarithmem (_, _)
                | Ibswap _| Ifloatsqrtf _)
   | Imove|Ispill|Ireload|Inegf|Iabsf|Iconst_float _|Icall_ind|Icall_imm _
   | Icompf _
