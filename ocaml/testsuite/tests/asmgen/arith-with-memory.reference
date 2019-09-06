@@ -1,0 +1,2 @@
+  a/32 := a/32 + int[V/31]{arith-with-memory.cmm:29,8-28}
+  b/33 := b/33 + int[y/30]{arith-with-memory.cmm:30,8-26}
