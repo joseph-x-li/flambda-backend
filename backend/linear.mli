@@ -17,12 +17,19 @@
 
 type label = Cmm.label
 
+module Fdo_info : sig
+  type t = private int option
+  val none : t
+  val create : int -> t
+end
+
 type instruction =
   { mutable desc: instruction_desc;
     mutable next: instruction;
     arg: Reg.t array;
     res: Reg.t array;
     dbg: Debuginfo.t;
+    fdo: Fdo_info.t;
     live: Reg.Set.t }
 
 and instruction_desc =
