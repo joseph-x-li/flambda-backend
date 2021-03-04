@@ -17,12 +17,6 @@
 
 type label = Cmm.label
 
-module Fdo_info : sig
-  type t = private int option
-  val none : t
-  val create : int -> t
-end
-
 type instruction =
   { mutable desc: instruction_desc;
     mutable next: instruction;

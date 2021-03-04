@@ -17,12 +17,6 @@ open Mach
 (* Transformation of Mach code into a list of pseudo-instructions. *)
 type label = Cmm.label
 
-module Fdo_info = struct
-  type t = int option
-  let none = None
-  let create i = Some i
-end
-
 type instruction =
   { mutable desc: instruction_desc;
     mutable next: instruction;
