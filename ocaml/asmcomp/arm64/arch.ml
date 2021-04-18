@@ -169,3 +169,24 @@ let print_specific_operation printreg op ppf arg =
   | Imove32 ->
       fprintf ppf "move32 %a"
         printreg arg.(0)
+
+(* Specific operations that are pure *)
+
+let operation_is_pure = function
+  | Ifar_alloc _
+  | Ifar_intop_checkbound
+  | Ifar_intop_imm_checkbound _
+  | Ishiftcheckbound _
+  | Ifar_shiftcheckbound _ -> false
+  | _ -> true
+
+(* Specific operations that can raise *)
+
+let operation_can_raise = function
+  | Ifar_alloc _
+  | Ifar_intop_checkbound
+  | Ifar_intop_imm_checkbound _
+  | Ishiftcheckbound _
+  | Ifar_shiftcheckbound _ -> true
+  | _ -> false
+

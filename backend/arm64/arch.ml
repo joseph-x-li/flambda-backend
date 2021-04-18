@@ -228,7 +228,9 @@ let equal_specific_operation left right =
     | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
     | Inegmulsubf | Isqrtf | Ibswap _ | Imove32), _ -> false
 
-let is_pure_specific : specific_operation -> bool = function
+(* Specific operations that are pure *)
+
+let operation_is_pure : specific_operation -> bool = function
   | Ifar_alloc _ -> false
   | Ifar_intop_checkbound -> false
   | Ifar_intop_imm_checkbound _ -> false
@@ -245,3 +247,16 @@ let is_pure_specific : specific_operation -> bool = function
   | Isqrtf -> true
   | Ibswap _ -> true
   | Imove32 -> true
+
+(* Specific operations that can raise *)
+
+let operation_can_raise = function
+  | Ifar_alloc _
+  | Ifar_intop_checkbound
+  | Ifar_intop_imm_checkbound _
+  | Ishiftcheckbound _
+  | Ifar_shiftcheckbound _ -> true
+  | _ -> false
+
+
+>>>>>>> 2ef28ac192 (Refactor Proc.op_is_pure and fix Mach.operation_can_raise)
