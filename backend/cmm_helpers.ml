@@ -2544,6 +2544,31 @@ let bigstring_set size unsafe arg1 arg2 arg3 dbg =
             check_bound unsafe size dbg (bigstring_length ba dbg)
               idx (unaligned_set size ba_data idx newval dbg))))))
 
+
+let transl_effects (e : Primitive.effects) : Cmm.effects =
+  match e with
+  | No_effects -> No_effects
+  | Only_generative_effects
+  | Arbitrary_effects -> Arbitrary_effects
+
+let transl_coeffects (ce : Primitive.coeffects) : Cmm.coeffects =
+  match ce with
+  | No_coeffects -> No_coeffects
+  | Has_coeffects -> Has_coeffects
+
+(* [cextcall] is called from [Cmmgen.transl_ccall] *)
+let cextcall (prim : Primitive.description) args dbg ret =
+  let name = Primitive.native_name prim in
+  let default = Cop(Cextcall { name; ret;
+                               builtin = prim.prim_builtin;
+                               effects = transl_effects prim.prim_effects;
+                               coeffects = transl_coeffects prim.prim_coeffects;
+                               alloc = prim.prim_alloc;
+                               label_after = None},
+                    args, dbg)
+  in
+  default
+
 (* Symbols *)
 
 let cdefine_symbol (symb, (global: Cmmgen_state.is_global)) =
