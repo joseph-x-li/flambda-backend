@@ -402,9 +402,11 @@ let init () =
 
 let operation_supported = function
   (* XCR mshinwell: This should be an exhaustive match. *)
+  | Cpopcnt -> !popcnt_support
   | Capply _ | Cextcall _ | Cload _ | Calloc | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi | Cdivi | Cmodi
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
+  | Cclz _ | Cctz _
   | Ccmpi _ | Caddv | Cadda | Ccmpa _
   | Cnegf | Cabsf | Caddf | Csubf | Cmulf | Cdivf
   | Cfloatofint | Cintoffloat | Ccmpf _
