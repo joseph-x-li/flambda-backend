@@ -1352,8 +1352,25 @@ let default_prim name =
 let int64_native_prim name arity ~alloc =
   let u64 = Primitive.Unboxed_integer Primitive.Pint64 in
   let rec make_args = function 0 -> [] | n -> u64 :: make_args (n - 1) in
+  let effects, coeffects =
+    if alloc
+    then Primitive.Arbitrary_effects, Primitive.No_coeffects
+    else Primitive.No_effects, Primitive.No_coeffects in
   Primitive.make ~name ~native_name:(name ^ "_native")
     ~alloc
+    ~builtin:false
+    (* XCR mshinwell: I don't think this is correct -- some of these have
+       [alloc = true], so must have (at least) effects
+
+       gyorsh: fixed.
+
+       In the version you reviewed, effects and coeffects fields
+       of builtin=false were ignored by middle-end and not propagated
+       to the backend, so lack of these settings didn't cause trouble,
+       but lying to the compiler is going to bite back
+       when we keep track of effects
+       all the way to Mach and not only for builtins. *)
+    ~effects ~coeffects
     ~native_repr_args:(make_args arity)
     ~native_repr_res:u64
 
