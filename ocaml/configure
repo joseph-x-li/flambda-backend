@@ -747,6 +747,8 @@ build_os
 build_vendor
 build_cpu
 build
+prefetchwt1_support
+prefetchw_support
 sse42_support
 popcnt_support
 stdlib_manpages
@@ -2907,6 +2909,8 @@ VERSION=4.11.1+dev0-2020-08-18
 
 # Check support for certain architecture-specific instructions.
 # Used to enable the corresponding intrinsics.
+
+
 
 
 
@@ -17008,6 +17012,8 @@ fi
 # Used to enable the corresponding intrinsics.
 popcnt_support=false
 sse42_support=false
+prefetchw_support=false
+prefetchwt1_support=false
 
 # Check whether --enable-check-cpu-support was given.
 if test "${enable_check_cpu_support+set}" = set; then :
@@ -17103,6 +17109,78 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether cpu supports prefetchw" >&5
+$as_echo_n "checking whether cpu supports prefetchw... " >&6; }
+  if test "$cross_compiling" = yes; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
+$as_echo "no assumed" >&6; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include "cpuid_check.h"
+
+int main()
+{
+  uint32_t abcd[4];
+
+  /* CPUID.(EAX=0x80000001H):ECX.PREFETCHW[bit 8] */
+  run_cpuid(0x80000001, 0, abcd);
+  return ((abcd[2] & (1 << 8)) == 0);
+}
+
+_ACEOF
+if ac_fn_c_try_run "$LINENO"; then :
+  prefetchw_support=true
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether cpu supports prefetchwt1" >&5
+$as_echo_n "checking whether cpu supports prefetchwt1... " >&6; }
+  if test "$cross_compiling" = yes; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
+$as_echo "no assumed" >&6; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include "cpuid_check.h"
+
+int main()
+{
+  uint32_t abcd[4];
+
+  /* CPUID.(EAX=07H):ECX.PREFETCHWT1[bit 0] */
+  run_cpuid(7, 0, abcd);
+  return ((abcd[2] & 1) == 0);
+}
+
+_ACEOF
+if ac_fn_c_try_run "$LINENO"; then :
+  prefetchwt1_support=true
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+       # The next check passes even if prefetchw* hints are not supported,
+       # because they are NOP
        if test "$popcnt_support" = "true" &&
               test "$sse42_support" = "true"; then :
 
