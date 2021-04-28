@@ -747,6 +747,7 @@ build_os
 build_vendor
 build_cpu
 build
+sse42_support
 popcnt_support
 stdlib_manpages
 PACKLD
@@ -2906,6 +2907,7 @@ VERSION=4.11.1+dev0-2020-08-18
 
 # Check support for certain architecture-specific instructions.
 # Used to enable the corresponding intrinsics.
+
 
 
 ## Generated files
@@ -17005,6 +17007,7 @@ fi
 # Check support for certain architecture-specific instructions.
 # Used to enable the corresponding intrinsics.
 popcnt_support=false
+sse42_support=false
 
 # Check whether --enable-check-cpu-support was given.
 if test "${enable_check_cpu_support+set}" = set; then :
@@ -17039,28 +17042,7 @@ else
 /* end confdefs.h.  */
 
 
-#include <stdint.h>
-#if defined(_MSC_VER)
-#include <intrin.h>
-#endif
-
-void run_cpuid(uint32_t eax, uint32_t ecx, uint32_t* abcd)
-{
-#if defined(_MSC_VER)
-    __cpuidex(abcd, eax, ecx);
-#else
-    uint32_t ebx=0, edx=0;
-
-# if defined( __i386__ ) && defined ( __PIC__ )
-     /* in case of PIC under 32-bit EBX cannot be clobbered */
-    __asm__ ( "movl %%ebx, %%edi \n\t cpuid \n\t xchgl %%ebx, %%edi" : "=D" (ebx),
-# else
-    __asm__ ( "cpuid" : "+b" (ebx),
-# endif
-              "+a" (eax), "+c" (ecx), "=d" (edx) );
-    abcd[0] = eax; abcd[1] = ebx; abcd[2] = ecx; abcd[3] = edx;
-#endif
-}
+#include "cpuid_check.h"
 
 int main()
 {
@@ -17085,14 +17067,51 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-       if test "$popcnt_support" = "true"; then :
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether cpu supports sse42" >&5
+$as_echo_n "checking whether cpu supports sse42... " >&6; }
+  if test "$cross_compiling" = yes; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no assumed" >&5
+$as_echo "no assumed" >&6; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+#include "cpuid_check.h"
+
+int main()
+{
+  uint32_t abcd[4];
+
+  /* CPUID.(EAX=01H):ECX.SSE42[bit 20] for crc32 */
+  run_cpuid(1, 0, abcd);
+  return ((abcd[2] & (1 << 20)) == 0);
+}
+
+_ACEOF
+if ac_fn_c_try_run "$LINENO"; then :
+  sse42_support=true
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+       if test "$popcnt_support" = "true" &&
+              test "$sse42_support" = "true"; then :
 
 else
   as_fn_error $? "CPU does not support the default intrinsics.
                   To skip the check, use --disable-check-cpu-support.
                   You must disable unsupported intrinsics at compile time,
                   using target-specific command-line options
-                  (for example: -fno-popcnt).
+                  (for example: -fno-popcnt -fno-sse42).
                   If you don't, it might lead to miscompilation." "$LINENO" 5
 fi
        ;; #(
