@@ -249,6 +249,7 @@ AWK=@AWK@
 STDLIB_MANPAGES=@stdlib_manpages@
 
 POPCNT_SUPPORT=@popcnt_support@
+SSE42_SUPPORT=@sse42_support@
 
 ### Native command to build ocamlrun.exe
 

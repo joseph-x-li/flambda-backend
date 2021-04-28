@@ -245,3 +245,4 @@ let config_var x =
       Some s
 
 let popcnt_support = %%POPCNT_SUPPORT%%
+let sse42_support = %%SSE42_SUPPORT%%

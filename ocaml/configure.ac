@@ -172,6 +172,7 @@ AC_SUBST([stdlib_manpages])
 # Check support for certain architecture-specific instructions.
 # Used to enable the corresponding intrinsics.
 AC_SUBST([popcnt_support])
+AC_SUBST([sse42_support])
 
 ## Generated files
 
@@ -1863,6 +1864,7 @@ AS_IF([test x"$probes" = "xfalse"],
 # Check support for certain architecture-specific instructions.
 # Used to enable the corresponding intrinsics.
 popcnt_support=false
+sse42_support=false
 
 AC_ARG_ENABLE([check-cpu-support],
   [AS_HELP_STRING([--disable-check-cpu-support],
@@ -1879,13 +1881,15 @@ AS_IF([test x"$enable_check_cpu_support" = "xno"],
   [AS_CASE([$arch],
     [amd64],
       [OCAML_CPU_SUPPORTS_POPCNT
-       AS_IF([test "$popcnt_support" = "true"],
+       OCAML_CPU_SUPPORTS_SSE42
+       AS_IF([test "$popcnt_support" = "true" &&
+              test "$sse42_support" = "true"],
        [],
        [AC_MSG_ERROR([CPU does not support the default intrinsics.
                   To skip the check, use --disable-check-cpu-support.
                   You must disable unsupported intrinsics at compile time,
                   using target-specific command-line options
-                  (for example: -fno-popcnt).
+                  (for example: -fno-popcnt -fno-sse42).
                   If you don't, it might lead to miscompilation.])])
       ],
     [*],[])])

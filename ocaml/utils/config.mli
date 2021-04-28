@@ -257,3 +257,4 @@ val config_var : string -> string option
 
 (** Support for architecture-specific instructions. *)
 val popcnt_support : bool
+val sse42_support : bool
