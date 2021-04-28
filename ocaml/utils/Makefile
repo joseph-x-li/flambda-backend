@@ -116,6 +116,8 @@ config.ml: config.mlp $(ROOTDIR)/Makefile.config Makefile
 	    $(call SUBST,AS_HAS_DEBUG_PREFIX_MAP) \
 	    $(call SUBST,POPCNT_SUPPORT) \
 	    $(call SUBST,SSE42_SUPPORT) \
+	    $(call SUBST,PREFETCHW_SUPPORT) \
+	    $(call SUBST,PREFETCHWT1_SUPPORT) \
 	    $< > $@
 
 # Test for the substitution functions above

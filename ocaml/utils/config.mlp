@@ -246,3 +246,5 @@ let config_var x =
 
 let popcnt_support = %%POPCNT_SUPPORT%%
 let sse42_support = %%SSE42_SUPPORT%%
+let prefetchw_support = %%PREFETCHW_SUPPORT%%
+let prefetchwt1_support = %%PREFETCHWT1_SUPPORT%%

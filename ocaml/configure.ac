@@ -173,6 +173,8 @@ AC_SUBST([stdlib_manpages])
 # Used to enable the corresponding intrinsics.
 AC_SUBST([popcnt_support])
 AC_SUBST([sse42_support])
+AC_SUBST([prefetchw_support])
+AC_SUBST([prefetchwt1_support])
 
 ## Generated files
 
@@ -1865,6 +1867,8 @@ AS_IF([test x"$probes" = "xfalse"],
 # Used to enable the corresponding intrinsics.
 popcnt_support=false
 sse42_support=false
+prefetchw_support=false
+prefetchwt1_support=false
 
 AC_ARG_ENABLE([check-cpu-support],
   [AS_HELP_STRING([--disable-check-cpu-support],
@@ -1882,6 +1886,10 @@ AS_IF([test x"$enable_check_cpu_support" = "xno"],
     [amd64],
       [OCAML_CPU_SUPPORTS_POPCNT
        OCAML_CPU_SUPPORTS_SSE42
+       OCAML_CPU_SUPPORTS_PREFETCHW
+       OCAML_CPU_SUPPORTS_PREFETCHWT1
+       # The next check passes even if prefetchw* hints are not supported,
+       # because they are NOP
        AS_IF([test "$popcnt_support" = "true" &&
               test "$sse42_support" = "true"],
        [],
