@@ -201,7 +201,7 @@ method! select_operation op args dbg =
       self#select_floatarith true Imulf Ifloatmul args
   | Cdivf ->
       self#select_floatarith false Idivf Ifloatdiv args
-  | Cextcall { name = "sqrt"; alloc = false; } ->
+  | Csqrt ->
      begin match args with
        [Cop(Cload ((Double|Double_u as chunk), _), [loc], _dbg)] ->
          let (addr, arg) = self#select_addressing chunk loc in
@@ -221,13 +221,9 @@ method! select_operation op args dbg =
       | _ ->
           super#select_operation op args dbg
       end
-  | Cextcall { name = "caml_bswap16_direct"; } ->
-      (Ispecific (Ibswap 16), args)
-  | Cextcall { name = "caml_int32_direct_bswap"; } ->
-      (Ispecific (Ibswap 32), args)
-  | Cextcall { name = "caml_int64_direct_bswap"; }
-  | Cextcall { name = "caml_nativeint_direct_bswap"; } ->
-      (Ispecific (Ibswap 64), args)
+  | Cbswap Sixteen -> Ispecific (Ibswap 16), args
+  | Cbswap Thirtytwo -> Ispecific (Ibswap 32), args
+  | Cbswap Sixtyfour -> Ispecific (Ibswap 64), args
   (* AMD64 does not support immediate operands for multiply high signed *)
   | Cmulhi ->
       (Iintop Imulh, args)
