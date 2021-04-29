@@ -115,12 +115,6 @@ let pseudoregs_for_operation op arg res =
   (* Other instructions are regular *)
   | _ -> raise Use_default
 
-(* If you update [inline_ops], you may need to update [is_simple_expr] and/or
-   [effects_of], below. *)
-let inline_ops =
-  [ "sqrt"; "caml_bswap16_direct"; "caml_int32_direct_bswap";
-    "caml_int64_direct_bswap"; "caml_nativeint_direct_bswap" ]
-
 (* The selector class *)
 
 class selector = object (self)
@@ -132,23 +126,6 @@ method is_immediate n = n <= 0x7FFF_FFFF && n >= (-1-0x7FFF_FFFF)
      (cf 'make check_all_arches') *)
 
 method is_immediate_natint n = n <= 0x7FFFFFFFn && n >= -0x80000000n
-
-method! is_simple_expr e =
-  match e with
-  | Cop(Cextcall { name = fn; }, args, _)
-    when List.mem fn inline_ops ->
-      (* inlined ops are simple if their arguments are *)
-      List.for_all self#is_simple_expr args
-  | _ ->
-      super#is_simple_expr e
-
-method! effects_of e =
-  match e with
-  | Cop(Cextcall { name = fn; }, args, _)
-    when List.mem fn inline_ops ->
-      Selectgen.Effect_and_coeffect.join_list_map args self#effects_of
-  | _ ->
-      super#effects_of e
 
 method select_addressing _chunk exp =
   let (a, d) = select_addr exp in
