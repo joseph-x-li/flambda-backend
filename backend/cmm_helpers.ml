@@ -2160,28 +2160,44 @@ let arraylength kind arg dbg =
    to Arbitrary_effects and Has_coeffects, resp.
    Check if this can be improved (e.g., bswap). *)
 
+(* XCR mshinwell: Please check if there are test cases that ensure we are
+   compiling the byte-swapping instructions as expected, since there have
+   been some changes here.
+
+   gyorsh: yes, there are testsuite/tests/prim-bswap/bswap.ml
+   and all tests pass. I've also inspected the generated code manually.
+*)
 let bbswap bi arg dbg =
-  let prim = match (bi : Primitive.boxed_integer) with
-    | Pnativeint -> "nativeint"
-    | Pint32 -> "int32"
-    | Pint64 -> "int64"
+  let prim, width = match (bi : Primitive.boxed_integer) with
+    | Pnativeint -> "nativeint",
+                    if size_int = 4 then Thirtytwo else Sixtyfour
+    | Pint32 -> "int32", Thirtytwo
+    | Pint64 -> "int64", Sixtyfour
   in
-  Cop(Cextcall { name = Printf.sprintf "caml_%s_direct_bswap" prim;
-                 builtin = false;
-                 effects = Arbitrary_effects;
-                 coeffects = Has_coeffects;
-                 ret = typ_int; alloc = false; label_after = None; },
-      [arg],
-      dbg)
+  let op = Cbswap width in
+  if Proc.operation_supported op then
+    Cop(op,[arg], dbg)
+  else
+    Cop(Cextcall { name = Printf.sprintf "caml_%s_direct_bswap" prim;
+                   builtin = false;
+                   effects = Arbitrary_effects;
+                   coeffects = Has_coeffects;
+                   ret = typ_int; alloc = false; label_after = None },
+        [arg],
+        dbg)
 
 let bswap16 arg dbg =
-  (Cop(Cextcall { name = "caml_bswap16_direct";
-                  builtin = false;
-                  effects = Arbitrary_effects;
-                  coeffects = Has_coeffects;
-                  ret = typ_int; alloc = false; label_after = None; },
-       [arg],
-       dbg))
+  let op = Cbswap Sixteen in
+  if Proc.operation_supported op then
+    Cop(op, [arg], dbg)
+  else
+    Cop(Cextcall { name = "caml_bswap16_direct";
+                   builtin = false;
+                   effects = Arbitrary_effects;
+                   coeffects = Has_coeffects;
+                   ret = typ_int; alloc = false; label_after = None },
+        [arg],
+        dbg)
 
 (* Untagging of a negative value shifts in an extra bit. The following code
    clears the shifted sign bit of the an untagged int.
@@ -2608,6 +2624,8 @@ let bigstring_set size unsafe arg1 arg2 arg3 dbg =
 *)
 let transl_builtin name args dbg =
   match name with
+  | "sqrt" ->
+    if_operation_supported Csqrt ~f:(fun () -> Cop(Csqrt, args, dbg))
   | "caml_int_clz_tagged_to_untagged" ->
     (* Takes tagged int and returns untagged int.
        The tag does not change the number of leading zeros. *)

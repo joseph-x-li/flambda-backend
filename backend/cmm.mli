@@ -130,7 +130,12 @@ type memory_chunk =
   | Double                             (* 64-bit-aligned 64-bit float *)
   | Double_u                           (* word-aligned 64-bit float *)
 
-and operation =
+type bswap_width_in_bits =
+  | Sixteen
+  | Thirtytwo
+  | Sixtyfour
+
+type operation =
     Capply of machtype
   | Cextcall of
       { name: string;
@@ -151,6 +156,8 @@ and operation =
   | Cclz of { arg_is_non_zero: bool; }
   | Cctz of { arg_is_non_zero: bool; }
   | Cpopcnt
+  | Csqrt
+  | Cbswap of bswap_width_in_bits
   | Ccmpi of integer_comparison
   | Caddv (* pointer addition that produces a [Val] (well-formed Caml value) *)
   | Cadda (* pointer addition that produces a [Addr] (derived heap pointer) *)

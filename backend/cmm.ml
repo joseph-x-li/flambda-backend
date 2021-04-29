@@ -136,7 +136,12 @@ type memory_chunk =
   | Double
   | Double_u
 
-and operation =
+type bswap_width_in_bits =
+  | Sixteen
+  | Thirtytwo
+  | Sixtyfour
+
+type operation =
     Capply of machtype
   | Cextcall of
       { name: string;
@@ -157,6 +162,8 @@ and operation =
   | Cclz of { arg_is_non_zero: bool; }
   | Cctz of { arg_is_non_zero: bool; }
   | Cpopcnt
+  | Csqrt
+  | Cbswap of bswap_width_in_bits
   | Ccmpi of integer_comparison
   | Caddv | Cadda
   | Ccmpa of integer_comparison
