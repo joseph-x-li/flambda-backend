@@ -138,6 +138,14 @@ let pseudoregs_for_operation op arg res =
   | Iname_for_debugger _|Iprobe _|Iprobe_is_enabled _
     -> raise Use_default
 
+let select_locality (l : Cmm.prefetch_temporal_locality_hint)
+  : Arch.prefetch_temporal_locality_hint =
+  match l with
+  | Nonlocal -> Nonlocal
+  | Low -> Low
+  | Moderate -> Moderate
+  | High -> High
+
 let one_arg name args =
   match args with
   | [arg] -> arg
@@ -308,6 +316,9 @@ method! select_operation op args dbg =
     | _ -> super#select_operation op args dbg
     end
   | Cprefetch { is_write; locality; } ->
+      match is_write, locality, prefetchw_support, prefetchwt1_support with
+      | true, High
+
       (* Emit prefetch for read hint when prefetchw is not supported.
          Matches the behavior of gcc's __builtin_prefetch *)
       let is_write =
@@ -318,9 +329,13 @@ method! select_operation op args dbg =
       (* XCR mshinwell: List.hd again *)
       let addr, eloc = self#select_addressing Word_int
                          (one_arg "prefetch" args) in
-      let locality = select_locality locality in
+      let locality =
+        match select_locality locality with
+        | Moderate when is_write && not !prefetchwt1_support -> High
+        | (High | Low | Nonlocal) as l -> l
+      in
       Ispecific (Iprefetch { is_write; addr; locality; }), [eloc]
-  | _ -> super#select_operation op args dbg
+    | _ -> super#select_operation op args dbg
 
 (* Recognize float arithmetic with mem *)
 
