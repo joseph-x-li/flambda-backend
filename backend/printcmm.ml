@@ -139,6 +139,10 @@ let operation d = function
   | Csubf -> "-f"
   | Cmulf -> "*f"
   | Cdivf -> "/f"
+  | Csqrt -> "sqrt"
+  | Cbswap Sixteen -> "bswap16"
+  | Cbswap Thirtytwo -> "bswap32"
+  | Cbswap Sixtyfour -> "bswap64"
   | Cfloatofint -> "floatofint"
   | Cintoffloat -> "intoffloat"
   | Ccmpf c -> Printf.sprintf "%sf" (float_comparison c)
