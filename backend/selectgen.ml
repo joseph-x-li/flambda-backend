@@ -78,7 +78,7 @@ let oper_result_type = function
   | Caddi | Csubi | Cmuli | Cmulhi | Cdivi | Cmodi |
     Cand | Cor | Cxor | Clsl | Clsr | Casr |
     Cclz _ | Cctz _ | Cpopcnt |
-    Cbswap _
+    Cbswap _ |
     Ccmpi _ | Ccmpa _ | Ccmpf _ -> typ_int
   | Caddv -> typ_val
   | Cadda -> typ_addr
