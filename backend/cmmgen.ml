@@ -24,8 +24,8 @@ open Primitive
 open Types
 open Lambda
 open Clambda
-open Clambda_primitives
 open Cmm
+open Clambda_primitives
 
 module String = Misc.Stdlib.String
 module IntMap = Map.Make(Int)
