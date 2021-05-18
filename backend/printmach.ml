@@ -186,7 +186,7 @@ let rec instr ppf i =
     end
   end;
   begin match i.desc with
-  | Iend -> ()
+  | Iend -> fprintf ppf "(end)"
   | Iop op ->
       operation op i.arg ppf i.res
   | Ireturn ->
@@ -234,7 +234,7 @@ let rec instr ppf i =
   if not (Debuginfo.is_none i.dbg) && !Clflags.locations then
     fprintf ppf "%s" (Debuginfo.to_string i.dbg);
   begin match i.next.desc with
-    Iend -> ()
+    Iend -> fprintf ppf "(end)"; ()
   | _ -> fprintf ppf "@,%a" instr i.next
   end
 

@@ -43,16 +43,16 @@ let is_trap_handler t label =
 (* Printing utilities for debug *)
 
 let print t oc msg =
-  Printf.fprintf oc "cfg for %s\n" msg;
+  Printf.fprintf oc "\n***\ncfg for %s\n" msg;
   Printf.fprintf oc "%s\n" t.cfg.fun_name;
   Printf.fprintf oc "layout.length=%d\n" (List.length t.layout);
   Printf.fprintf oc "blocks.length=%d\n" (Label.Tbl.length t.cfg.blocks);
   let print_block label =
     let block = Label.Tbl.find t.cfg.blocks label in
-    Printf.fprintf oc "\n%d:\n" label;
-    List.iter (Cfg.print_basic oc) block.body;
+    Printf.fprintf oc "\n---\nblock %d:\n" label;
+    List.iter (fun x -> Cfg.print_basic oc x; Printf.fprintf oc "\n") block.body;
     Cfg.print_terminator oc block.terminator;
-    Printf.fprintf oc "\npredecessors:";
+    Printf.fprintf oc "predecessors:";
     Label.Set.iter (Printf.fprintf oc " %d") block.predecessors;
     Printf.fprintf oc "\nsuccessors:";
     Label.Set.iter (Printf.fprintf oc " %d")

@@ -321,6 +321,10 @@ let add_prologue first_insn prologue_required =
   skip_naming_ops first_insn
 
 let fundecl f =
+  if !Clflags.use_ocamlcfg then begin
+    let cfg_with_layout = Cfgize.fundecl f ~preserve_orig_labels:false in
+    Cfg_with_layout.print cfg_with_layout stdout f.Mach.fun_name;
+  end;
   let fun_prologue_required = Proc.prologue_required f in
   let contains_calls = f.Mach.fun_contains_calls in
   let fun_tailrec_entry_point_label, fun_body =
