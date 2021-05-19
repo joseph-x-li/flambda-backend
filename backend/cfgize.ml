@@ -156,10 +156,70 @@ let copy_instruction
     let id = get_next_instruction_id () in
     { desc; arg; res; dbg; live; trap_depth; id; }
 
+let can_raise_operation
+  : Cfg.operation -> bool
+  = fun op ->
+    match op with
+    | Move -> false
+    | Spill -> false
+    | Reload -> false
+    | Const_int _ -> false
+    | Const_float _ -> false
+    | Const_symbol _ -> false
+    | Stackoffset _ -> false
+    | Load _ -> false
+    | Store _  -> false
+    | Intop _ -> false
+    | Intop_imm _ -> false
+    | Negf -> false
+    | Absf -> false
+    | Addf -> false
+    | Subf -> false
+    | Mulf -> false
+    | Divf -> false
+    | Floatofint -> false
+    | Intoffloat -> false
+    | Probe _ -> false (* CR xclerc for xclerc: double check *)
+    | Probe_is_enabled _ -> false (* CR xclerc for xclerc: double check *)
+    | Specific _ -> false (* CR xclerc for xclerc: double check *)
+    | Name_for_debugger _ -> false
+
+let can_raise_instr
+  : Cfg.basic Cfg.instruction -> bool
+  = fun instr ->
+    match instr.desc with
+    | Op op -> can_raise_operation op
+    | Call _ -> true
+    | Reloadretaddr -> false
+    | Pushtrap _ -> false
+    | Poptrap -> false
+    | Prologue -> false
+
+let can_raise_instrs
+  : Cfg.basic Cfg.instruction list -> bool
+  = fun instrs ->
+    List.exists can_raise_instr instrs
+
+let can_raise_terminator
+  : Cfg.terminator -> bool
+  = fun terminator ->
+    match terminator with
+    | Never -> false
+    | Always _ -> false
+    | Parity_test _ -> false
+    | Truth_test _ -> false
+    | Float_test _ -> false
+    | Int_test _ -> false
+    | Switch _ -> false
+    | Return -> false
+    | Raise _ -> true
+    | Tailcall _ -> false
+
 type block_info = {
   instrs : Cfg.basic Cfg.instruction list;
   last : Mach.instruction;
   terminator : Cfg.terminator option;
+  can_raise : bool;
 }
 
 (* [extract_block_info first ~fun_name ~trap_depth] returns a [block_info]
@@ -172,16 +232,23 @@ let extract_block_info
   : Mach.instruction -> fun_name:string -> trap_depth:int -> block_info
   = fun first ~fun_name ~trap_depth ->
     let rec loop (instr : Mach.instruction) acc =
-      let return terminator = { instrs = List.rev acc; last = instr; terminator; } in
+      let return terminator can_raise =
+        let instrs = List.rev acc in
+        let can_raise = can_raise || can_raise_instrs instrs in
+        { instrs; last = instr; terminator; can_raise; } in
       match instr.desc with
       | Iop op ->
         begin match basic_or_terminator_of_operation op ~fun_name with
-          | Basic desc -> loop instr.next (copy_instruction instr ~desc ~trap_depth :: acc)
-          | Terminator terminator -> return (Some terminator)
+          | Basic desc ->
+            loop instr.next (copy_instruction instr ~desc ~trap_depth :: acc)
+          | Terminator terminator ->
+            return (Some terminator) (can_raise_terminator terminator)
         end
       | Iend | Ireturn | Iifthenelse _ | Iswitch _
-      | Icatch _ | Iexit _ | Itrywith _ | Iraise _ ->
-        return None in
+      | Icatch _ | Iexit _ | Itrywith _ ->
+        return None false
+      | Iraise _ ->
+        return None true in
     loop first []
 
 (* Represents the control flow exiting the function without encountering a return. *)
@@ -258,7 +325,8 @@ let rec add_blocks
     -> next:Label.t
     -> unit
   = fun instr state ~fun_name ~start ~exns ~trap_depth ~next ->
-    let { instrs; last; terminator; } = extract_block_info instr ~fun_name ~trap_depth in
+    let { instrs; last; terminator; can_raise; } =
+      extract_block_info instr ~fun_name ~trap_depth in
     let terminate_block desc =
       State.add_block state ~label:start ~block:{
         start;
@@ -267,16 +335,16 @@ let rec add_blocks
         predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
         trap_depth;
         exns;
-        (* CR xclerc for xclerc: double check that the following fields are indeed
-           expected to be computed later. *)
-        (* CR gyorsh: [can_raise] should be computed in cfgize either as a
+        (* XCR gyorsh: [can_raise] should be computed in cfgize either as a
            separate pass or add a field of [block_info] to record it.
            If / when we make calls as terminators, we won't need to compute
            it during extract_block_info.
         *)
-        can_raise = false;
-        (* CR gyorsh: I think that [can_raise_interproc] is not used after computation of
-           exceptional successors. *)
+        can_raise;
+        (* XCR gyorsh: I think that [can_raise_interproc] is not used after computation of
+           exceptional successors.
+           xclerc: sorry I am not sure how to interpret your comment; should it be
+           computed here? *)
         can_raise_interproc = false;
         (* CR gyorsh: [is_trap_handler] is needed for cfg_to_linear.
            where does cfgize compute it? *)
