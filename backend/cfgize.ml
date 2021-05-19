@@ -2,7 +2,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 type basic_or_terminator =
-  | Basic of Cfg.basic 
+  | Basic of Cfg.basic
   | Terminator of Cfg.terminator
 
 let basic_or_terminator_of_operation
@@ -161,7 +161,7 @@ type block_info = {
   terminator : Cfg.terminator option;
 }
 
-(* [extract_block_info first ~fun_name ~trap_depth] returns a [build_info]
+(* [extract_block_info first ~fun_name ~trap_depth] returns a [block_info]
    containing all the instructions starting from [first] until some kind of
    control flow is encountered or the end of the block is reached (i.e. [Iend]).
    If the returned terminator is [None], it is guaranteed that the [last]
@@ -221,6 +221,10 @@ end = struct
   let get_layout t = List.rev t.layout
 
   let add_catch_handler t ~handler_id ~label =
+    (* CR gyorsh: fail if handler_id is already in the table?
+       Previous passes are supposed to guarantee that handler ids are unique within
+       a function, but it is easy to check and might pay off as we add new
+       transformations (and bugs). *)
     Numbers.Int.Tbl.replace t.catch_handlers handler_id label
 
   let get_handler_label t ~handler_id =
@@ -233,18 +237,18 @@ end = struct
 end
 
 (* [add_blocks instr state ~fun_name ~start ~exns ~trap_depth ~next] adds the block
-   beginning at [instr] with label [star], and all recursively-reachable blocks to
+   beginning at [instr] with label [start], and all recursively-reachable blocks to
    [state]; [next] is the label of the block to be executed after the one beginning
    at [instr]. *)
 let rec add_blocks
   : Mach.instruction
     -> State.t
     -> fun_name:string
-    -> start:Label.t
-    -> exns:Label.Set.t
-    -> trap_depth:int
-    -> next:Label.t
-    -> unit
+  -> start:Label.t
+  -> exns:Label.Set.t
+  -> trap_depth:int
+  -> next:Label.t
+  -> unit
   = fun instr state ~fun_name ~start ~exns ~trap_depth ~next ->
     let { instrs; last; terminator; } = extract_block_info instr ~fun_name ~trap_depth in
     let terminate_block desc =
@@ -257,8 +261,17 @@ let rec add_blocks
         exns;
         (* CR xclerc for xclerc: double check that the following fields are indeed
            expected to be computed later. *)
+        (* CR gyorsh: [can_raise] should be computed in cfgize either as a
+           separate pass or add a field of [block_info] to record it.
+           If / when we make calls as terminators, we won't need to compute
+           it during extract_block_info.
+        *)
         can_raise = false;
+        (* CR gyorsh: I think that [can_raise_interproc] is not used after computation of
+           exceptional successors. *)
         can_raise_interproc = false;
+        (* CR gyorsh: [is_trap_handler] is needed for cfg_to_linear.
+           where does cfgize compute it? *)
         is_trap_handler = false;
         dead = false;
       } in
@@ -268,7 +281,9 @@ let rec add_blocks
       | Iop _ | Ireturn | Iifthenelse _ | Iswitch _
       | Icatch _ | Iexit _ | Itrywith _ | Iraise _ ->
         let start = Cmm.new_label () in
-        start, (fun () -> add_blocks last.next state ~fun_name ~start ~exns ~trap_depth ~next) in
+        start, (fun () -> add_blocks
+                            last.next state ~fun_name ~start ~exns ~trap_depth ~next) in
+    (* CR gyorsh for gyorsh: it should be the same layout as linearize *)
     match terminator with
     | Some terminator -> terminate_block terminator
     | None ->
@@ -325,7 +340,8 @@ let rec add_blocks
         let label_handler = Cmm.new_label () in
         terminate_block (Cfg.Always label_body);
         let next, add_next_block = prepare_next_block () in
-        add_blocks body state ~fun_name ~start:label_body ~exns:(Label.Set.singleton label_handler) ~trap_depth:(succ trap_depth) ~next;
+        add_blocks body state ~fun_name ~start:label_body
+          ~exns:(Label.Set.singleton label_handler) ~trap_depth:(succ trap_depth) ~next;
         add_blocks handler state ~fun_name ~start:label_handler ~exns ~trap_depth ~next;
         add_next_block ()
       | Iraise raise_kind ->
@@ -342,7 +358,8 @@ let update_blocks_with_predecessors
             match Label.Tbl.find_opt cfg.blocks successor_label with
             | None ->
               Misc.fatal_errorf "Cfgize.update_blocks_with_predecessors received an \
-                                 inconsistent graph (no block labelled %d)" successor_label
+                                 inconsistent graph (no block labelled %d)"
+                successor_label
             | Some successor_block ->
               successor_block.predecessors <-
                 Label.Set.add block_label successor_block.predecessors)
@@ -372,10 +389,15 @@ let fundecl
       ~exns:Label.Set.empty
       ~trap_depth:0
       ~next:fallthrough_label;
+    (* CR gyorsh: is this adding an extra block at the front of the layout? The start
+       label of the very first block should be entry_label, tailrec_label comes after it,
+       not the other way around.  *)
     State.add_block state ~label:tailrec_label ~block:{
       start = tailrec_label;
       body = [];
-      terminator = (copy_instruction fun_body ~desc:(Cfg.Always (Cfg.entry_label cfg)) ~trap_depth:0);
+      terminator = (copy_instruction fun_body ~desc:(Cfg.Always (Cfg.entry_label cfg))
+                      (* CR gyorsh: why is trap_depth 0 here? *)
+                      ~trap_depth:0);
       predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
       trap_depth = 0;
       exns = Label.Set.empty;
