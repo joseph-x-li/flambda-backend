@@ -483,7 +483,7 @@ let fundecl
        not the other way around.  *)
     State.add_block state ~label:(Cfg.entry_label cfg) ~block:{
       start = (Cfg.entry_label cfg);
-      body = [];
+      body = [copy_instruction fun_body ~desc:Cfg.Prologue ~trap_depth:0];
       terminator = (copy_instruction fun_body ~desc:(Cfg.Always tailrec_label) ~trap_depth:0);
       predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
       trap_depth = 0;
