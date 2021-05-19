@@ -218,7 +218,8 @@ end = struct
     t.layout <- label :: t.layout;
     Label.Tbl.replace t.blocks label block
 
-  let get_layout t = List.rev t.layout
+  let get_layout t =
+    List.rev t.layout
 
   let add_catch_handler t ~handler_id ~label =
     (* CR gyorsh: fail if handler_id is already in the table?
@@ -244,11 +245,11 @@ let rec add_blocks
   : Mach.instruction
     -> State.t
     -> fun_name:string
-  -> start:Label.t
-  -> exns:Label.Set.t
-  -> trap_depth:int
-  -> next:Label.t
-  -> unit
+    -> start:Label.t
+    -> exns:Label.Set.t
+    -> trap_depth:int
+    -> next:Label.t
+    -> unit
   = fun instr state ~fun_name ~start ~exns ~trap_depth ~next ->
     let { instrs; last; terminator; } = extract_block_info instr ~fun_name ~trap_depth in
     let terminate_block desc =
@@ -281,11 +282,13 @@ let rec add_blocks
       | Iop _ | Ireturn | Iifthenelse _ | Iswitch _
       | Icatch _ | Iexit _ | Itrywith _ | Iraise _ ->
         let start = Cmm.new_label () in
-        start, (fun () -> add_blocks
-                            last.next state ~fun_name ~start ~exns ~trap_depth ~next) in
+        let add_next_block () =
+          add_blocks last.next state ~fun_name ~start ~exns ~trap_depth ~next in
+        start, add_next_block in
     (* CR gyorsh for gyorsh: it should be the same layout as linearize *)
     match terminator with
-    | Some terminator -> terminate_block terminator
+    | Some terminator ->
+      terminate_block terminator
     | None ->
       match last.desc with
       | Iop _ ->
