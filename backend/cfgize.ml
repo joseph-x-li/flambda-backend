@@ -215,19 +215,25 @@ end = struct
     { blocks; layout; catch_handlers; }
 
   let add_block t ~label ~block =
-    (* CR xclerc for xclerc: fail if there is already a block with the passed label. *)
-    t.layout <- label :: t.layout;
-    Label.Tbl.replace t.blocks label block
+    if Label.Tbl.mem t.blocks label then
+      Misc.fatal_errorf "Cfgize.State.add_block duplicate block for label %d" label
+    else begin
+      t.layout <- label :: t.layout;
+      Label.Tbl.replace t.blocks label block;
+    end
 
   let get_layout t =
     List.rev t.layout
 
   let add_catch_handler t ~handler_id ~label =
-    (* CR gyorsh: fail if handler_id is already in the table?
+    (* XCR gyorsh: fail if handler_id is already in the table?
        Previous passes are supposed to guarantee that handler ids are unique within
        a function, but it is easy to check and might pay off as we add new
        transformations (and bugs). *)
-    Numbers.Int.Tbl.replace t.catch_handlers handler_id label
+    if Numbers.Int.Tbl.mem t.catch_handlers handler_id then
+      Misc.fatal_errorf "Cfgize.State.add_catch_handler duplicate handler %d" handler_id
+    else
+      Numbers.Int.Tbl.replace t.catch_handlers handler_id label
 
   let get_handler_label t ~handler_id =
     match Numbers.Int.Tbl.find_opt t.catch_handlers handler_id with
