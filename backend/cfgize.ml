@@ -360,7 +360,8 @@ let rec add_blocks
         let add_next_block () =
           add_blocks last.next state ~fun_name ~start ~exns ~trap_depth ~next in
         start, add_next_block in
-    (* CR gyorsh for gyorsh: it should be the same layout as linearize *)
+    (* XCR gyorsh for gyorsh: it should be the same layout as linearize
+       xclerc: is it a nice-to-have (e.g. for testing), or a hard requirement? *)
     match terminator with
     | Some terminator ->
       terminate_block terminator
@@ -481,7 +482,9 @@ let fundecl
       start = tailrec_label;
       body = [];
       terminator = (copy_instruction fun_body ~desc:(Cfg.Always start_label)
-                      (* CR gyorsh: why is trap_depth 0 here? *)
+                      (* XCR gyorsh: why is trap_depth 0 here?
+                         xclerc: sorry, how could this block be under a
+                         [try .. with ...] construct? *)
                       ~trap_depth:0);
       predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
       trap_depth = 0;
