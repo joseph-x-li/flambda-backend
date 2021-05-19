@@ -1,4 +1,4 @@
-(* CR xclerc for xclerc: use the same warning set as flambda2. *)
+(* CR-soon xclerc for xclerc: use the same warning set as flambda2. *)
 [@@@ocaml.warning "+a-40-41-42"]
 open! Int_replace_polymorphic_compare[@@ocaml.warning "-66"]
 
@@ -136,7 +136,7 @@ let terminator_of_test
     | Ieventest ->
       Parity_test { ifso = label_true; ifnot = label_false; }
 
-(* CR xclerc for xclerc: double check whether it should be reset for each function. *)
+(* CR-soon xclerc for xclerc: double check whether it should be reset for each function. *)
 let get_next_instruction_id
   : unit -> int
   =
