@@ -388,24 +388,31 @@ let fundecl
           fun_spacetime_shape = _;
           fun_num_stack_slots = _;
           fun_contains_calls = _; } = fundecl in
+    let start_label = Cmm.new_label () in
     let tailrec_label = Cmm.new_label () in
     let cfg = Cfg.create ~fun_name ~fun_tailrec_entry_point_label:tailrec_label in
     let state = State.make cfg.blocks in
-    add_blocks
-      fun_body
-      state
-      ~fun_name
-      ~start:(Cfg.entry_label cfg)
-      ~exns:Label.Set.empty
-      ~trap_depth:0
-      ~next:fallthrough_label;
-    (* CR gyorsh: is this adding an extra block at the front of the layout? The start
+    (* XCR gyorsh: is this adding an extra block at the front of the layout? The start
        label of the very first block should be entry_label, tailrec_label comes after it,
        not the other way around.  *)
+    State.add_block state ~label:(Cfg.entry_label cfg) ~block:{
+      start = (Cfg.entry_label cfg);
+      body = [];
+      terminator = (copy_instruction fun_body ~desc:(Cfg.Always tailrec_label) ~trap_depth:0);
+      predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
+      trap_depth = 0;
+      exns = Label.Set.empty;
+      (* CR xclerc for xclerc: double check that the following fields are indeed
+         expected to be computed later. *)
+      can_raise = false;
+      can_raise_interproc = false;
+      is_trap_handler = false;
+      dead = false;
+    };
     State.add_block state ~label:tailrec_label ~block:{
       start = tailrec_label;
       body = [];
-      terminator = (copy_instruction fun_body ~desc:(Cfg.Always (Cfg.entry_label cfg))
+      terminator = (copy_instruction fun_body ~desc:(Cfg.Always start_label)
                       (* CR gyorsh: why is trap_depth 0 here? *)
                       ~trap_depth:0);
       predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
@@ -418,6 +425,14 @@ let fundecl
       is_trap_handler = false;
       dead = false;
     };
+    add_blocks
+      fun_body
+      state
+      ~fun_name
+      ~start:start_label
+      ~exns:Label.Set.empty
+      ~trap_depth:0
+      ~next:fallthrough_label;
     update_blocks_with_predecessors cfg;
     Cfg_with_layout.create
       cfg
