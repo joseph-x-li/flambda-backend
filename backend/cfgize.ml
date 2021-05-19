@@ -471,8 +471,6 @@ let fundecl
       predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
       trap_depth = 0;
       exns = Label.Set.empty;
-      (* CR xclerc for xclerc: double check that the following fields are indeed
-         expected to be computed later. *)
       can_raise = false;
       can_raise_interproc = false;
       is_trap_handler = false;
@@ -489,8 +487,6 @@ let fundecl
       predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
       trap_depth = 0;
       exns = Label.Set.empty;
-      (* CR xclerc for xclerc: double check that the following fields are indeed
-         expected to be computed later. *)
       can_raise = false;
       can_raise_interproc = false;
       is_trap_handler = false;
@@ -509,5 +505,4 @@ let fundecl
       cfg
       ~layout:(State.get_layout state)
       ~preserve_orig_labels
-      (* CR xclerc for xclerc: double check that it is fine to return an empty set. *)
       ~new_labels:Label.Set.empty
