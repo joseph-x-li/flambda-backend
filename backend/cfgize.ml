@@ -346,9 +346,9 @@ let rec add_blocks
            xclerc: sorry I am not sure how to interpret your comment; should it be
            computed here? *)
         can_raise_interproc = false;
-        (* CR gyorsh: [is_trap_handler] is needed for cfg_to_linear.
+        (* XCR gyorsh: [is_trap_handler] is needed for cfg_to_linear.
            where does cfgize compute it? *)
-        is_trap_handler = false;
+        is_trap_handler = false; (* See [update_trap_handler_blocks] *)
         dead = false;
       } in
     let prepare_next_block () =
@@ -445,6 +445,23 @@ let update_blocks_with_predecessors
          successor_labels)
     cfg.blocks
 
+let update_trap_handler_blocks
+  : Cfg.t -> unit
+  = fun cfg ->
+    Label.Tbl.iter
+      (fun _block_label block ->
+         Label.Set.iter
+           (fun exn_label ->
+              match Label.Tbl.find_opt cfg.blocks exn_label with
+              | None ->
+                Misc.fatal_errorf "Cfgize.update_trap_handler_blocks received an \
+                                   inconsistent graph (no block labelled %d)"
+                  exn_label
+              | Some exn_block ->
+                exn_block.is_trap_handler <- true)
+           block.Cfg.exns)
+      cfg.blocks
+
 let fundecl
   : Mach.fundecl -> preserve_orig_labels:bool -> Cfg_with_layout.t
   = fun fundecl ~preserve_orig_labels ->
@@ -501,6 +518,7 @@ let fundecl
       ~trap_depth:0
       ~next:fallthrough_label;
     update_blocks_with_predecessors cfg;
+    update_trap_handler_blocks cfg;
     Cfg_with_layout.create
       cfg
       ~layout:(State.get_layout state)
