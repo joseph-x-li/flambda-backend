@@ -1,5 +1,6 @@
 (* CR xclerc for xclerc: use the same warning set as flambda2. *)
 [@@@ocaml.warning "+a-40-41-42"]
+open! Int_replace_polymorphic_compare[@@ocaml.warning "-66"]
 
 type basic_or_terminator =
   | Basic of Cfg.basic
