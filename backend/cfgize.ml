@@ -293,10 +293,6 @@ end = struct
     List.rev t.layout
 
   let add_catch_handler t ~handler_id ~label =
-    (* XCR gyorsh: fail if handler_id is already in the table?
-       Previous passes are supposed to guarantee that handler ids are unique within
-       a function, but it is easy to check and might pay off as we add new
-       transformations (and bugs). *)
     if Numbers.Int.Tbl.mem t.catch_handlers handler_id then
       Misc.fatal_errorf "Cfgize.State.add_catch_handler duplicate handler %d" handler_id
     else
@@ -335,11 +331,6 @@ let rec add_blocks
         predecessors = Label.Set.empty; (* See [update_blocks_with_predecessors] *)
         trap_depth;
         exns;
-        (* XCR gyorsh: [can_raise] should be computed in cfgize either as a
-           separate pass or add a field of [block_info] to record it.
-           If / when we make calls as terminators, we won't need to compute
-           it during extract_block_info.
-        *)
         can_raise;
         (* XCR gyorsh: I think that [can_raise_interproc] is not used after computation of
            exceptional successors.
