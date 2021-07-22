@@ -1478,6 +1478,11 @@ let emit_probe_handler_wrapper p =
   cfi_endproc ();
   emit_function_type_and_size wrap_label
 
+let probe_name p =
+  match p.probe_insn.desc with
+  | Lop (Iprobe { name; _; }) -> name
+  | _ -> assert false
+
 let emit_probe_notes0 () =
   begin match system with
   | S_gnu | S_cygwin | S_solaris | S_win32 | S_linux_elf | S_bsd_elf
@@ -1498,11 +1503,7 @@ let emit_probe_notes0 () =
     Printf.sprintf "%d@%s" (Reg.size_of_contents_in_bytes arg) arg_name
   in
   let describe_one_probe p =
-    let probe_name =
-      match p.probe_insn.desc with
-      | Lop (Iprobe { name; _; }) -> name
-      | _ -> assert false
-    in
+    let probe_name = probe_name p in
     let args =
       Array.fold_right (fun arg acc -> (stap_arg arg)::acc)
         p.probe_insn.arg
@@ -1569,9 +1570,53 @@ let emit_probe_notes0 () =
     !probe_semaphores
 
 let emit_probe_notes () =
-  match !probes with
-  | [] -> ()
+  match !probes, String.Map.is_empty !probe_semaphores with
+  | [], true -> ()
   | _ -> emit_probe_notes0 ()
+
+let emit_dummy_probes () =
+  let semaphores_without_probes =
+    List.fold_left (fun acc probe ->
+      String.Map.remove (probe_name probe) acc)
+      !probe_semaphores !probes in
+  if not (String.Map.is_empty semaphores_without_probes) then begin
+    let handler_code_sym = Compilenv.make_symbol (Some "___nop") in
+    let nop_function =
+      { fun_name = handler_code_sym;
+        fun_body = instr_cons Lreturn [||] [||] Linear.end_instr;
+        fun_fast = false;
+        fun_dbg = Debuginfo.none;
+        fun_spacetime_shape = None;
+        fun_tailrec_entry_point_label = None;
+        fun_contains_calls = false;
+        fun_num_stack_slots = num_stack_slots;
+        fun_frame_required = false;
+        fun_prologue_required = false;
+      }
+    in
+    let fun_body =
+      String.Map.fold (fun name _label next ->
+        let dummy_probe = Lop (Iprobe { name; handler_code_sym; }) in
+        instr_cons dummy_probe [||] [||] next)
+        semaphores_without_probes
+        (instr_cons Lreturn [||] [||] Linear.end_instr)
+    in
+    let dummy_probes_function =
+      { fun_name = Compilenv.make_symbol (Some "___dummy_probes");
+        fun_body;
+        fun_fast = false;
+        fun_dbg = Debuginfo.none;
+        fun_spacetime_shape = None;
+        fun_tailrec_entry_point_label = None;
+        fun_contains_calls = true;
+        fun_num_stack_slots = num_stack_slots;
+        fun_frame_required = true;
+        fun_prologue_required = true;
+      }
+    in
+    fundecl nop_function;
+    fundecl dummy_probes_function;
+  end
 
 let end_assembly() =
   if !float_constants <> [] then begin
@@ -1583,6 +1628,9 @@ let end_assembly() =
     end;
     List.iter (fun (cst,lbl) -> emit_float_constant cst lbl) !float_constants
   end;
+
+  (* Emit dummy probes for semaphores without probes in this compilation unit *)
+  emit_dummy_probes ();
 
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper !probes;
