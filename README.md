@@ -59,3 +59,8 @@ before running `make compare`.
 There is also a `make ci` target (best run as e.g. `make -j16 ci`) which does a full build
 and test run.  It does not currently run `make compare` as some spurious failures have
 been observed on the Github systems.
+
+## Dependencies
+
+- `opam install lambdasoup ppx_compare` for flambda2 tests
+- `opam install re` for ocaml manual
