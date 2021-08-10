@@ -28,6 +28,9 @@ let prefetchw_support = ref true
 (* PREFETCHWT1 is Intel Xeon Phi only. *)
 let prefetchwt1_support = ref false
 
+(* Integer arithmetic operations with memory operands *)
+let intarithmem = ref false
+
 (* Machine-specific command-line options *)
 
 let command_line_options =
@@ -52,6 +55,8 @@ let command_line_options =
       " Use PREFETCHWT1 instructions (Intel Xeon Phi only)";
     "-fno-prefetchwt1", Arg.Clear prefetchwt1_support,
       " Do not use PREFETCHWT1 instructions (default)";
+    "-fintarithmem", Arg.Set intarithmem,
+      " Emit integer operations with memory operands";
   ]
 
 (* Specific operations for the AMD64 processor *)

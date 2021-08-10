@@ -405,6 +405,9 @@ method select_floatarith commutative regular_op mem_op args =
       assert false
 
 method select_intarith regular_op (mem_op : Arch.int_operation) commutative args dbg =
+  if not !intarithmem
+  then super#select_operation regular_op args dbg
+  else
   match args with
   | [arg1; Cop(Cload ((Word_int as chunk), _), [loc2], _)] ->
       let (addr, arg2) = self#select_addressing chunk loc2 in
