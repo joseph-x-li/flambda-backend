@@ -109,6 +109,11 @@ val iter_blocks : t -> f:(Label.t -> basic_block -> unit) -> unit
 
 (** Printing *)
 
+val dump_terminator :
+  Format.formatter -> ?sep:string -> terminator instruction -> unit
+
+val dump_basic : Format.formatter -> basic instruction -> unit
+
 val print_terminator :
   out_channel -> ?sep:string -> terminator instruction -> unit
 

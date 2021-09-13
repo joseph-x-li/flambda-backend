@@ -103,4 +103,5 @@ let run cfg_with_layout =
   then (
     Printf.printf "%s: eliminated %d block that were dead or fallthrough.\n"
       cfg.fun_name (len - new_len);
-    CL.save_as_dot cfg_with_layout "after_elim_ft")
+    CL.save_as_dot cfg_with_layout "after_elim_ft");
+  cfg_with_layout

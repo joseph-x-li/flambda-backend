@@ -29,6 +29,16 @@ type error =
 
 exception Error of error
 
+let cfg_invariants ppf cfg =
+  let print_fundecl ppf c =
+    if !Clflags.dump_cfg then Cfg_with_layout.dump ppf c ~msg:"invariant failed"
+    else Format.fprintf ppf "%s" (Cfg_with_layout.cfg c).fun_name
+  in
+  if !Clflags.cfg_invariants && Cfg_invariants.run ppf cfg then
+    Misc.fatal_errorf "Cfg invariants failed on following fundecl:@.%a@."
+      print_fundecl cfg;
+  cfg
+
 let liveness phrase = Liveness.fundecl phrase; phrase
 
 let dump_if ppf flag message phrase =
@@ -41,13 +51,27 @@ let pass_dump_linear_if ppf flag message phrase =
   if !flag then fprintf ppf "*** %s@.%a@." message Printlinear.fundecl phrase;
   phrase
 
+let pass_dump_cfg_if ppf flag message c =
+  if !flag then
+    fprintf ppf "*** %s@.%a@." message (Cfg_with_layout.dump ~msg:"") c;
+  c
+
 let start_from_emit = ref true
 
 let should_save_before_emit () =
   should_save_ir_after Compiler_pass.Scheduling && (not !start_from_emit)
 
+let should_save_cfg_before_emit () =
+  should_save_ir_after Compiler_pass.Simplify_cfg && (not !start_from_emit)
+
 let linear_unit_info =
   { Linear_format.unit_name = "";
+    items = [];
+    for_pack = None;
+  }
+
+let cfg_unit_info =
+  { Cfg_format.unit_name = "";
     items = [];
     for_pack = None;
   }
@@ -58,11 +82,19 @@ let reset () =
     linear_unit_info.unit_name <- Compilenv.current_unit_name ();
     linear_unit_info.items <- [];
     linear_unit_info.for_pack <- !Clflags.for_package;
+  end;
+  if should_save_cfg_before_emit () then begin
+    cfg_unit_info.unit_name <- Compilenv.current_unit_name ();
+    cfg_unit_info.items <- [];
+    cfg_unit_info.for_pack <- !Clflags.for_package;
   end
 
 let save_data dl =
   if should_save_before_emit () then begin
     linear_unit_info.items <- Linear_format.(Data dl) :: linear_unit_info.items
+  end;
+  if should_save_cfg_before_emit () then begin
+    cfg_unit_info.items <- Cfg_format.(Data dl) :: cfg_unit_info.items
   end;
   dl
 
@@ -72,11 +104,22 @@ let save_linear f =
   end;
   f
 
-let write_linear prefix =
+let save_cfg f =
+  if should_save_cfg_before_emit () then begin
+    cfg_unit_info.items <- Cfg_format.(Cfg f) :: cfg_unit_info.items
+  end;
+  f
+
+let write_ir prefix =
   if should_save_before_emit () then begin
     let filename = Compiler_pass.(to_output_filename Scheduling ~prefix) in
     linear_unit_info.items <- List.rev linear_unit_info.items;
     Linear_format.save filename linear_unit_info
+  end;
+  if should_save_cfg_before_emit () then begin
+    let filename = Compiler_pass.(to_output_filename Simplify_cfg ~prefix) in
+    cfg_unit_info.items <- List.rev cfg_unit_info.items;
+    Cfg_format.save filename cfg_unit_info
   end
 
 let should_emit () =
@@ -142,12 +185,25 @@ let compile_fundecl ~ppf_dump fd_cmm =
   ++ Profile.record ~accumulate:true "linearize" Linearize.fundecl
   ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
   ++ (fun (fd : Linear.fundecl) ->
-      if !use_ocamlcfg then begin
-        let cfg = Linear_to_cfg.run fd ~preserve_orig_labels:true in
+    if !use_ocamlcfg then begin
+      fd
+      ++ Profile.record ~accumulate:true "linear_to_cfg"
+           (Linear_to_cfg.run ~preserve_orig_labels:false)
+      ++ pass_dump_cfg_if ppf_dump dump_cfg "After linear_to_cfg"
+      ++ Profile.record ~accumulate:true "cfg_invariants"
+           (cfg_invariants ppf_dump)
+      ++ Profile.record ~accumulate:true "eliminate_fallthrough"
+           Eliminate_fallthrough_blocks.run
+      ++ pass_dump_cfg_if ppf_dump dump_cfg "After eliminate_fallthrough"
+      ++ Profile.record ~accumulate:true "cfg_invariants"
+           (cfg_invariants ppf_dump)
+      ++ save_cfg
+      ++ Profile.record ~accumulate:true "cfg_to_linear" (fun cfg ->
         let fun_body, fun_tailrec_entry_point_label = Cfg_to_linear.run cfg in
-        { fd with Linear.fun_body; fun_tailrec_entry_point_label; }
-      end else
-        fd)
+        { fd with Linear.fun_body; fun_tailrec_entry_point_label; })
+      ++ pass_dump_linear_if ppf_dump dump_linear "After cfg_to_linear"
+    end else
+      fd)
   ++ Profile.record ~accumulate:true "scheduling" Scheduling.fundecl
   ++ pass_dump_linear_if ppf_dump dump_scheduling "After instruction scheduling"
   ++ save_linear
@@ -187,7 +243,7 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename gen =
        Misc.try_finally
          (fun () ->
             gen ();
-            write_linear output_prefix)
+            write_ir output_prefix)
          ~always:(fun () ->
              if create_asm then close_out !Emitaux.output_channel)
          ~exceptionally:(fun () ->

@@ -116,6 +116,8 @@ val dump_instr : bool ref
 val keep_camlprimc_file : bool ref
 val keep_asm_file : bool ref
 val optimize_for_speed : bool ref
+val dump_cfg : bool ref
+val cfg_invariants : bool ref
 val dump_cmm : bool ref
 val dump_selection : bool ref
 val dump_cse : bool ref
@@ -307,8 +309,16 @@ val set_oclassic : unit -> unit
 val set_o2 : unit -> unit
 val set_o3 : unit -> unit
 
+module Compiler_ir : sig
+  type t = Linear | Cfg
+  val all : t list
+  val to_string : t -> string
+  val extension : t -> string
+  val extract_extension_with_pass : string -> (t * string) option
+end
+
 module Compiler_pass : sig
-  type t = Parsing | Typing | Scheduling | Emit
+  type t = Parsing | Typing | Scheduling | Emit | Simplify_cfg
   val of_string : string -> t option
   val to_string : t -> string
   val is_compilation_pass : t -> bool
