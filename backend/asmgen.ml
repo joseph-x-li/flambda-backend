@@ -51,8 +51,17 @@ let start_from_emit = ref true
 let should_save_before_emit () =
   should_save_ir_after Compiler_pass.Scheduling && (not !start_from_emit)
 
+let should_save_cfg_before_emit () =
+  should_save_ir_after Compiler_pass.Simplify_cfg && (not !start_from_emit)
+
 let linear_unit_info =
   { Linear_format.unit_name = "";
+    items = [];
+    for_pack = None;
+  }
+
+let cfg_unit_info =
+  { Cfg_format.unit_name = "";
     items = [];
     for_pack = None;
   }
@@ -63,11 +72,19 @@ let reset () =
     linear_unit_info.unit_name <- Compilenv.current_unit_name ();
     linear_unit_info.items <- [];
     linear_unit_info.for_pack <- !Clflags.for_package;
+  end;
+  if should_save_cfg_before_emit () then begin
+    cfg_unit_info.unit_name <- Compilenv.current_unit_name ();
+    cfg_unit_info.items <- [];
+    cfg_unit_info.for_pack <- !Clflags.for_package;
   end
 
 let save_data dl =
   if should_save_before_emit () then begin
     linear_unit_info.items <- Linear_format.(Data dl) :: linear_unit_info.items
+  end;
+  if should_save_cfg_before_emit () then begin
+    cfg_unit_info.items <- Cfg_format.(Data dl) :: cfg_unit_info.items
   end;
   dl
 
@@ -78,10 +95,22 @@ let save_linear f =
   f
 
 let write_linear prefix =
+let save_cfg f =
+  if should_save_cfg_before_emit () then begin
+    cfg_unit_info.items <- Cfg_format.(Cfg f) :: cfg_unit_info.items
+  end;
+  f
+
+let write_ir prefix =
   if should_save_before_emit () then begin
     let filename = Compiler_pass.(to_output_filename Scheduling ~prefix) in
     linear_unit_info.items <- List.rev linear_unit_info.items;
     Linear_format.save filename linear_unit_info
+  end;
+  if should_save_cfg_before_emit () then begin
+    let filename = Compiler_pass.(to_output_filename Simplify_cfg ~prefix) in
+    cfg_unit_info.items <- List.rev cfg_unit_info.items;
+    Cfg_format.save filename cfg_unit_info
   end
 
 let should_emit () =
@@ -152,6 +181,7 @@ let compile_fundecl ~ppf_dump fd_cmm =
       ++ Profile.record ~accumulate:true "linear_to_cfg"
            (Linear_to_cfg.run ~preserve_orig_labels:false)
       ++ pass_dump_cfg_if ppf_dump dump_cfg "After linear_to_cfg"
+      ++ save_cfg
       ++ Profile.record ~accumulate:true "cfg_to_linear" (fun cfg ->
         let fun_body, fun_tailrec_entry_point_label = Cfg_to_linear.run cfg in
         { fd with Linear.fun_body; fun_tailrec_entry_point_label; })
@@ -197,7 +227,7 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename gen =
        Misc.try_finally
          (fun () ->
             gen ();
-            write_linear output_prefix)
+            write_ir output_prefix)
          ~always:(fun () ->
              if create_asm then close_out !Emitaux.output_channel)
          ~exceptionally:(fun () ->
