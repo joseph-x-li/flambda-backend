@@ -118,6 +118,7 @@ and opaque = ref false                  (* -opaque *)
 
 and dump_cmm = ref false                (* -dcmm *)
 let dump_cfg = ref false                (* -dcfg *)
+let cfg_invariants = ref false          (* -dcfg-invariants *)
 let dump_selection = ref false          (* -dsel *)
 let dump_cse = ref false                (* -dcse *)
 let dump_live = ref false               (* -dlive *)

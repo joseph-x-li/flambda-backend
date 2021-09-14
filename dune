@@ -100,6 +100,7 @@
     cfg cfg_intf cfg_to_linear cfg_with_layout disconnect_block
     eliminate_dead_blocks eliminate_fallthrough_blocks merge_straightline_blocks
     extra_debug label linear_to_cfg linear_utils simplify_terminator trap_stack
+    cfg_invariants
 
     ;; file_formats/
     linear_format
@@ -1090,6 +1091,14 @@
     (.ocamloptcomp.objs/native/unbox_specialised_args.cmx as compiler-libs/unbox_specialised_args.cmx)
     (.ocamloptcomp.objs/native/var_within_closure.cmx as compiler-libs/var_within_closure.cmx)
     (.ocamloptcomp.objs/native/variable.cmx as compiler-libs/variable.cmx)
+
+    (cfg_invariants.mli as compiler-libs/cfg_invariants.mli)
+    (.ocamloptcomp.objs/native/cfg_invariants.cmx as compiler-libs/cfg_invariants.cmx)
+    (.ocamloptcomp.objs/byte/cfg_invariants.cmi as compiler-libs/cfg_invariants.cmi)
+    (.ocamloptcomp.objs/byte/cfg_invariants.cmo as compiler-libs/cfg_invariants.cmo)
+    (.ocamloptcomp.objs/byte/cfg_invariants.cmt as compiler-libs/cfg_invariants.cmt)
+    (.ocamloptcomp.objs/byte/cfg_invariants.cmti as compiler-libs/cfg_invariants.cmti)
+
     (cfg_format.mli as compiler-libs/cfg_format.mli)
     (.ocamloptcomp.objs/native/cfg_format.cmx as compiler-libs/cfg_format.cmx)
     (.ocamloptcomp.objs/byte/cfg_format.cmi as compiler-libs/cfg_format.cmi)

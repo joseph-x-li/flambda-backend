@@ -803,6 +803,10 @@ let mk_dcfg f =
   "-dcfg", Arg.Unit f, " (undocumented)"
 ;;
 
+let mk_dcfg_invariants f =
+  "-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg"
+;;
+
 let mk_dcmm f =
   "-dcmm", Arg.Unit f, " (undocumented)"
 ;;
@@ -1393,6 +1397,7 @@ module type Optcommon_options = sig
   val _drawclambda : unit -> unit
   val _dclambda : unit -> unit
   val _dcfg : unit -> unit
+  val _dcfg_invariants : unit -> unit
   val _dcmm : unit -> unit
   val _dsel : unit -> unit
   val _dcombine : unit -> unit
@@ -1873,6 +1878,7 @@ struct
     mk_dflexpect F._dflexpect;
     mk_dclosure_offsets F._dclosure_offsets;
     mk_dcfg F._dcfg;
+    mk_dcfg_invariants F._dcfg_invariants;
     mk_dcmm F._dcmm;
     mk_dsel F._dsel;
     mk_dcombine F._dcombine;
@@ -2047,6 +2053,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_drawflambda F._drawflambda;
     mk_dflambda F._dflambda;
     mk_dcfg F._dcfg;
+    mk_dcfg_invariants F._dcfg_invariants;
     mk_dcmm F._dcmm;
     mk_dsel F._dsel;
     mk_dcombine F._dcombine;
@@ -2227,6 +2234,7 @@ module Default = struct
     let _davail () = dump_avail := true
     let _dclambda = set dump_clambda
     let _dcfg = set dump_cfg
+    let _dcfg_invariants = set cfg_invariants
     let _dcmm = set dump_cmm
     let _dcombine = set dump_combine
     let _dcse = set dump_cse

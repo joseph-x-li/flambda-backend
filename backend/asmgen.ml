@@ -29,6 +29,16 @@ type error =
 
 exception Error of error
 
+let cfg_invariants ppf cfg =
+  let print_fundecl ppf c =
+    if !Clflags.dump_cfg then Cfg_with_layout.dump ppf c ~msg:"invariant failed"
+    else Format.fprintf ppf "%s" (Cfg_with_layout.cfg c).fun_name
+  in
+  if !Clflags.cfg_invariants && Cfg_invariants.run ppf cfg then
+    Misc.fatal_errorf "Cfg invariants failed on following fundecl:@.%a@."
+      print_fundecl cfg;
+  cfg
+
 let liveness phrase = Liveness.fundecl phrase; phrase
 
 let dump_if ppf flag message phrase =
@@ -94,7 +104,6 @@ let save_linear f =
   end;
   f
 
-let write_linear prefix =
 let save_cfg f =
   if should_save_cfg_before_emit () then begin
     cfg_unit_info.items <- Cfg_format.(Cfg f) :: cfg_unit_info.items
@@ -181,6 +190,8 @@ let compile_fundecl ~ppf_dump fd_cmm =
       ++ Profile.record ~accumulate:true "linear_to_cfg"
            (Linear_to_cfg.run ~preserve_orig_labels:false)
       ++ pass_dump_cfg_if ppf_dump dump_cfg "After linear_to_cfg"
+      ++ Profile.record ~accumulate:true "cfg_invariants"
+           (cfg_invariants ppf_dump)
       ++ save_cfg
       ++ Profile.record ~accumulate:true "cfg_to_linear" (fun cfg ->
         let fun_body, fun_tailrec_entry_point_label = Cfg_to_linear.run cfg in

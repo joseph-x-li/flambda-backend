@@ -117,6 +117,7 @@ val keep_camlprimc_file : bool ref
 val keep_asm_file : bool ref
 val optimize_for_speed : bool ref
 val dump_cfg : bool ref
+val cfg_invariants : bool ref
 val dump_cmm : bool ref
 val dump_selection : bool ref
 val dump_cse : bool ref
