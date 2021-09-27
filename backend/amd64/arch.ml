@@ -20,6 +20,11 @@ let popcnt_support = ref true
 
 (* CRC32 requires SSE 4.2 support *)
 let crc32_support = ref true
+let sse42_support = ref true
+let mk_sse42 ~enabled =
+  Arg.Unit (fun () ->
+      crc32_support := enabled;
+      sse42_support := enabled)
 
 (* PREFETCHW instruction is not available on processors
    based on Haswell or earlier microarchitectures. *)
@@ -43,6 +48,10 @@ let command_line_options =
       " Use CRC32 instructions (requires SSE4.2 support) (default)";
     "-fno-crc32", Arg.Clear crc32_support,
       " Do not emit CRC32 instructions";
+    "-fsse4.2", mk_sse42 ~enabled:true,
+      " Use SSE4.2 instructions (default, implies -fcrc32)";
+    "-fno-sse4.2", mk_sse42 ~enabled:false,
+      " Do not emit SSE4.2 instructions (implies -fno-crc32)";
     "-fprefetchw", Arg.Set prefetchw_support,
       " Use PREFETCHW instructions (not available on Haswell and earlier) \
         (default)";
