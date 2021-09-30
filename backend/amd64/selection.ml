@@ -91,11 +91,12 @@ let rdx = phys_reg 4
 let pseudoregs_for_operation op arg res =
   match op with
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
-    Iintop(Iadd|Isub|Imul|Iand|Ior|Ixor) | Iaddf|Isubf|Imulf|Idivf ->
+    Iintop(Iadd|Isub|Imul|Iand|Ior|Ixor)
+  | Ifloatop(Iaddf|Isubf|Imulf|Idivf) ->
       ([|res.(0); arg.(1)|], res)
   (* One-address unary operations: arg.(0) and res.(0) must be the same *)
   | Iintop_imm((Iadd|Isub|Imul|Iand|Ior|Ixor|Ilsl|Ilsr|Iasr), _)
-  | Iabsf | Inegf
+  | Ifloatop(Iabsf | Inegf)
   | Ispecific(Ibswap (32|64)) ->
       (res, res)
   (* For xchg, args must be a register allowing access to high 8 bit register
@@ -121,7 +122,7 @@ let pseudoregs_for_operation op arg res =
       ([| rax; rcx |], [| rax |])
   | Iintop(Imod) ->
       ([| rax; rcx |], [| rdx |])
-  | Icompf cond ->
+  | Ifloatop(Icompf cond) ->
     (* CR gyorsh: make this optimization as a separate PR. *)
       (* We need to temporarily store the result of the comparison in a
          float register, but we don't want to clobber any of the inputs
@@ -371,7 +372,7 @@ method select_floatarith commutative regular_op mem_op args =
       (Ispecific(Ifloatarithmem(mem_op, addr)),
                  [arg2; arg1])
   | [arg1; arg2] ->
-      (regular_op, [arg1; arg2])
+      (Ifloatop regular_op, [arg1; arg2])
   | _ ->
       assert false
 
