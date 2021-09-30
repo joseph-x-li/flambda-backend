@@ -195,6 +195,9 @@ let operation_can_raise op =
   | Ialloc _ -> true
   | _ -> false
 
+let mem_operand mode index =
+  Imem (mode, index)
+
 let free_conts_for_handlers fundecl =
   let module S = Numbers.Int.Set in
   let module M = Numbers.Int.Map in
