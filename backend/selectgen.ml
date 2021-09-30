@@ -584,12 +584,12 @@ method select_operation op args _dbg =
   | (Cadda, _) -> self#select_arith_comm Iadd args
   | (Ccmpa comp, _) -> self#select_arith_comp (Iunsigned comp) args
   | (Ccmpf comp, _) -> self#select_floatarith_comp comp args
-  | (Cnegf, _) -> self#select_floatarith Inegf args
-  | (Cabsf, _) -> self#select_floatarith Iabsf args
-  | (Caddf, _) -> self#select_floatarith Iaddf args
-  | (Csubf, _) -> self#select_floatarith Isubf args
-  | (Cmulf, _) -> self#select_floatarith Imulf args
-  | (Cdivf, _) -> self#select_floatarith Idivf args
+  | (Cnegf, _) -> self#select_floatarith Inegf args ~commutative:false
+  | (Cabsf, _) -> self#select_floatarith Iabsf args ~commutative:false
+  | (Caddf, _) -> self#select_floatarith Iaddf args ~commutative:true
+  | (Csubf, _) -> self#select_floatarith Isubf args ~commutative:false
+  | (Cmulf, _) -> self#select_floatarith Imulf args ~commutative:true
+  | (Cdivf, _) -> self#select_floatarith Idivf args ~commutative:false
   | (Cfloatofint, _) -> (Ifloatofint, args, [||])
   | (Cintoffloat, _) -> (Iintoffloat, args, [||])
   | (Ccheckbound, _) ->
@@ -622,8 +622,31 @@ method private select_arith_comp cmp = function
   | args ->
       (Iintop(Icomp cmp), args, [||])
 
-method private select_floatarith op args =
-  (Ifloatop op, args, [||])
+(* CR gyorsh: we might need more information on which arg can be in memory,
+   and for swapping args. *)
+method memory_operands_supported op = false
+
+method private select_operands op args ~commutative ~chunk =
+  match args with
+  | [arg1; Cop(Cload (c, _), [loc2], _)]
+       when self#memory_operands_supported op
+            && equal_memory_chunk chunk c ->
+     let (addr, arg2) = self#select_addressing chunk loc2 in
+     op,
+     [arg1; arg2],
+     [| Ireg 0; mem_operand addr 1 |]
+  | [Cop(Cload (c, _), [loc1], _); arg2]
+       when commutative
+            && self#memory_operands_supported op
+            && equal_memory_chunk chunk c ->
+      let (addr, arg1) = self#select_addressing chunk loc1 in
+      op,
+      [arg2; arg1],
+      [| Ireg 0; mem_operand addr 1; |]
+  | _ -> op, args, [||]
+
+method private select_floatarith op args ~commutative =
+  self#select_operands (Ifloatop op) args ~commutative ~chunk:Double
 
 method private select_floatarith_comp op args =
   (Ifloatop(Icompf op), args, [||])
