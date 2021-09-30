@@ -88,7 +88,7 @@ let rax = phys_reg 0
 let rcx = phys_reg 5
 let rdx = phys_reg 4
 
-let pseudoregs_for_operation op arg res =
+let pseudoregs_for_operation op arg res operands =
   match op with
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
     Iintop(Iadd|Isub|Imul|Iand|Ior|Ixor)
@@ -253,7 +253,7 @@ method! select_operation op args dbg =
         (Iindexed _, _)
       | (Iindexed2 0, _) -> super#select_operation op args dbg
       | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr,
-         arg) -> (Ispecific(Ilea addr), [arg])
+         arg) -> (Ispecific(Ilea addr), [arg], [||])
       end
   (* Recognize float arithmetic with memory. *)
   | Caddf ->
@@ -268,9 +268,9 @@ method! select_operation op args dbg =
      begin match args with
        [Cop(Cload ((Double as chunk), _), [loc], _dbg)] ->
          let (addr, arg) = self#select_addressing chunk loc in
-         (Ispecific(Ifloatsqrtf addr), [arg])
+         (Ispecific(Ifloatsqrtf addr), [arg], [||])
      | [arg] ->
-         (Ispecific Isqrtf, [arg])
+         (Ispecific Isqrtf, [arg], [||])
      | _ ->
          assert false
     end
@@ -278,30 +278,30 @@ method! select_operation op args dbg =
                ty = [|Int|]; ty_args = [XFloat] }
   | Cextcall { func = "caml_int64_float_of_bits_unboxed"; alloc = false;
                ty = [|Float|]; ty_args = [XInt64] } ->
-     Imove, args
+     Imove, args, [||]
   | Cextcall { func; builtin = true; ty = ret; ty_args = _; } ->
       begin match func, ret with
-      | "caml_rdtsc_unboxed", [|Int|] -> Ispecific Irdtsc, args
-      | "caml_rdpmc_unboxed", [|Int|] -> Ispecific Irdpmc, args
+      | "caml_rdtsc_unboxed", [|Int|] -> Ispecific Irdtsc, args, [||]
+      | "caml_rdpmc_unboxed", [|Int|] -> Ispecific Irdpmc, args, [||]
       | ("caml_int64_crc_unboxed", [|Int|]
         | "caml_int_crc_untagged", [|Int|]) when !Arch.crc32_support ->
-          Ispecific Icrc32q, args
+          Ispecific Icrc32q, args, [||]
       | "caml_float_iround_half_to_even_unboxed", [|Int|] ->
-         Ispecific Ifloat_iround, args
+         Ispecific Ifloat_iround, args, [||]
       | "caml_float_round_half_to_even_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Half_to_even), args
+         Ispecific (Ifloat_round Half_to_even), args, [||]
       | "caml_float_round_up_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Up), args
+         Ispecific (Ifloat_round Up), args, [||]
       | "caml_float_round_down_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Down), args
+         Ispecific (Ifloat_round Down), args, [||]
       | "caml_float_round_towards_zero_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Towards_zero), args
+         Ispecific (Ifloat_round Towards_zero), args, [||]
       | "caml_float_round_current_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Current), args
+         Ispecific (Ifloat_round Current), args, [||]
       | "caml_float_min_unboxed", [|Float|] ->
-         Ispecific Ifloat_min, args
+         Ispecific Ifloat_min, args, [||]
       | "caml_float_max_unboxed", [|Float|] ->
-         Ispecific Ifloat_max, args
+         Ispecific Ifloat_max, args, [||]
       | _ ->
         super#select_operation op args dbg
       end
@@ -311,22 +311,22 @@ method! select_operation op args dbg =
         [loc; Cop(Caddi, [Cop(Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
         when loc = loc' && is_immediate n ->
           let (addr, arg) = self#select_addressing chunk loc in
-          (Ispecific(Ioffset_loc(n, addr)), [arg])
+          (Ispecific(Ioffset_loc(n, addr)), [arg], [||])
       | _ ->
           super#select_operation op args dbg
       end
   | Cextcall { func = "caml_bswap16_direct"; } ->
-      (Ispecific (Ibswap 16), args)
+      (Ispecific (Ibswap 16), args, [||])
   | Cextcall { func = "caml_int32_direct_bswap"; } ->
-      (Ispecific (Ibswap 32), args)
+      (Ispecific (Ibswap 32), args, [||])
   | Cextcall { func = "caml_int64_direct_bswap"; }
   | Cextcall { func = "caml_nativeint_direct_bswap"; } ->
-      (Ispecific (Ibswap 64), args)
+      (Ispecific (Ibswap 64), args, [||])
   (* Recognize sign extension *)
   | Casr ->
       begin match args with
         [Cop(Clsl, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
-          (Ispecific Isextend32, [k])
+          (Ispecific Isextend32, [k], [||])
         | _ -> super#select_operation op args dbg
       end
   (* Recognize zero extension *)
@@ -336,7 +336,7 @@ method! select_operation op args dbg =
     | [arg; Cconst_natint (0xffff_ffffn, _)]
     | [Cconst_int (0xffff_ffff, _); arg]
     | [Cconst_natint (0xffff_ffffn, _); arg] ->
-      Ispecific Izextend32, [arg]
+      Ispecific Izextend32, [arg], [||]
     | _ -> super#select_operation op args dbg
     end
   | Cprefetch { is_write; locality; } ->
@@ -355,8 +355,9 @@ method! select_operation op args dbg =
       let addr, eloc =
         self#select_addressing Word_int (one_arg "prefetch" args)
       in
-      Ispecific (Iprefetch { is_write; addr; locality; }), [eloc]
+      Ispecific (Iprefetch { is_write; addr; locality; }), [eloc], [||]
   | _ -> super#select_operation op args dbg
+
 
 (* Recognize float arithmetic with mem *)
 
@@ -365,14 +366,14 @@ method select_floatarith commutative regular_op mem_op args =
     [arg1; Cop(Cload ((Double as chunk), _), [loc2], _)] ->
       let (addr, arg2) = self#select_addressing chunk loc2 in
       (Ispecific(Ifloatarithmem(mem_op, addr)),
-                 [arg1; arg2])
+                 [arg1; arg2], [||])
   | [Cop(Cload ((Double as chunk), _), [loc1], _); arg2]
         when commutative ->
       let (addr, arg1) = self#select_addressing chunk loc1 in
       (Ispecific(Ifloatarithmem(mem_op, addr)),
-                 [arg2; arg1])
+                 [arg2; arg1], [||])
   | [arg1; arg2] ->
-      (Ifloatop regular_op, [arg1; arg2])
+      (Ifloatop regular_op, [arg1; arg2], [||])
   | _ ->
       assert false
 
@@ -381,15 +382,15 @@ method! mark_c_tailcall =
 
 (* Deal with register constraints *)
 
-method! insert_op_debug env op dbg rs rd =
+method! insert_op_debug env op dbg rs rd operands =
   try
-    let (rsrc, rdst) = pseudoregs_for_operation op rs rd in
+    let (rsrc, rdst) = pseudoregs_for_operation op rs rd operands in
     self#insert_moves env rs rsrc;
-    self#insert_debug env (Iop op) dbg rsrc rdst;
+    self#insert_debug env (Iop op) dbg rsrc rdst operands;
     self#insert_moves env rdst rd;
     rd
   with Use_default ->
-    super#insert_op_debug env op dbg rs rd
+    super#insert_op_debug env op dbg rs rd operands
 
 end
 

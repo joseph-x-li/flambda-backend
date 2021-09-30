@@ -119,6 +119,7 @@ module S = struct
     { desc : 'a;
       arg : Reg.t array;
       res : Reg.t array;
+      operands : Mach.operand array;
       dbg : Debuginfo.t;
       fdo : Fdo_info.t;
       live : Reg.Set.t;

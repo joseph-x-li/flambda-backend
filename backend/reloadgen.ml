@@ -22,7 +22,7 @@ open Mach
 let insert_move src dst next =
   if src.loc = dst.loc
   then next
-  else instr_cons (Iop Imove) [|src|] [|dst|] next
+  else instr_cons (Iop Imove) [|src|] [|dst|] [||] next
 
 let insert_moves src dst next =
   let rec insmoves i =
@@ -116,13 +116,13 @@ method private reload i k =
           self#reload i.next (fun next ->
             k (insert_moves i.arg newarg
                  (instr_cons (Iifthenelse(tst, ifso, ifnot))
-                    newarg [||] next)))))
+                    newarg [||] i.operands next)))))
   | Iswitch(index, cases) ->
       let newarg = self#makeregs i.arg in
       let cases = Array.map (fun case -> self#reload case Fun.id) cases in
       self#reload i.next (fun next ->
         k (insert_moves i.arg newarg
-             (instr_cons (Iswitch(index, cases)) newarg [||] next)))
+             (instr_cons (Iswitch(index, cases)) newarg [||] i.operands next)))
   | Icatch(rec_flag, ts, handlers, body) ->
       let new_handlers = List.map
           (fun (nfail, ts, handler) -> nfail, ts, self#reload handler Fun.id)
@@ -130,15 +130,15 @@ method private reload i k =
       self#reload body (fun body ->
         self#reload i.next (fun next ->
           k (instr_cons (Icatch(rec_flag, ts, new_handlers, body))
-               [||] [||] next)))
+               [||] [||] [||] next)))
   | Iexit (i, traps) ->
-      k (instr_cons (Iexit (i, traps)) [||] [||] dummy_instr)
+      k (instr_cons (Iexit (i, traps)) [||] [||] [||] dummy_instr)
   | Itrywith(body, kind, (ts, handler)) ->
       self#reload body (fun body ->
         self#reload handler (fun handler ->
           self#reload i.next (fun next ->
             k (instr_cons (Itrywith(body, kind, (ts, handler)))
-                 [||] [||] next))))
+                 [||] [||] [||] next))))
 
 method fundecl f num_stack_slots =
   redo_regalloc <- false;

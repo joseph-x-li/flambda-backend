@@ -250,11 +250,12 @@ let make_instruction :
  fun state ~desc ~trap_depth ->
   let arg = [||] in
   let res = [||] in
+  let operands = [||] in
   let dbg = Debuginfo.none in
   let fdo = Fdo_info.none in
   let live = Reg.Set.empty in
   let id = State.get_next_instruction_id state in
-  { desc; arg; res; dbg; live; trap_depth; id; fdo }
+  { desc; arg; res; operands; dbg; live; trap_depth; id; fdo }
 
 let copy_instruction :
     type a.
@@ -263,6 +264,7 @@ let copy_instruction :
  fun state instr ~desc ~trap_depth ->
   let { Mach.arg;
         res;
+        operands;
         dbg;
         live;
         desc = _;
@@ -274,7 +276,7 @@ let copy_instruction :
   in
   let id = State.get_next_instruction_id state in
   let fdo = Fdo_info.none in
-  { desc; arg; res; dbg; live; trap_depth; id; fdo }
+  { desc; arg; res; operands; dbg; live; trap_depth; id; fdo }
 
 let copy_instruction_no_reg :
     type a.
@@ -283,6 +285,7 @@ let copy_instruction_no_reg :
  fun state instr ~desc ~trap_depth ->
   let { Mach.arg = _;
         res = _;
+        operands = _;
         dbg;
         live;
         desc = _;
@@ -294,9 +297,10 @@ let copy_instruction_no_reg :
   in
   let arg = [||] in
   let res = [||] in
+  let operands = [||] in
   let id = State.get_next_instruction_id state in
   let fdo = Fdo_info.none in
-  { desc; arg; res; dbg; live; trap_depth; id; fdo }
+  { desc; arg; res; operands; dbg; live; trap_depth; id; fdo }
 
 let can_raise_operation : Cfg.operation -> bool =
  fun op ->

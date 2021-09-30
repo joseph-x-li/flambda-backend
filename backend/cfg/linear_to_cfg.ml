@@ -109,6 +109,7 @@ let create_instruction t desc ~trap_depth (i : Linear.instruction) :
   { desc;
     arg = i.arg;
     res = i.res;
+    operands = i.operands;
     dbg = i.dbg;
     fdo = i.fdo;
     live = i.live;
@@ -158,6 +159,7 @@ let create_empty_block t start ~trap_depth ~traps =
     { desc = C.Never (* placeholder for terminator, to be replaced *);
       arg = [||];
       res = [||];
+      operands = [||];
       dbg = Debuginfo.none;
       fdo = Fdo_info.none;
       live = Reg.Set.empty;
@@ -325,7 +327,7 @@ let get_or_make_label t (insn : Linear.instruction) : Linear_utils.labelled_insn
   | Lpoptrap | Lraise _ ->
     let label = Cmm.new_label () in
     t.new_labels <- Label.Set.add label t.new_labels;
-    let insn = Linear.instr_cons (Llabel label) [||] [||] insn in
+    let insn = Linear.instr_cons (Llabel label) [||] [||] [||] insn in
     { label; insn }
 
 let of_cmm_float_test ~lbl ~inv (cmp : Cmm.float_comparison) : C.float_test =

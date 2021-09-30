@@ -30,12 +30,13 @@ module L = Linear
 
 let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     L.instruction =
-  let arg, res, dbg, live, fdo =
+  let arg, res, operands, dbg, live, fdo =
     match like with
-    | None -> [||], [||], Debuginfo.none, Reg.Set.empty, Fdo_info.none
-    | Some like -> like.arg, like.res, like.dbg, like.live, like.fdo
+    | None -> [||], [||], [||], Debuginfo.none, Reg.Set.empty, Fdo_info.none
+    | Some like ->
+      like.arg, like.res, like.operands, like.dbg, like.live, like.fdo
   in
-  { desc; next; arg; res; dbg; live; fdo }
+  { desc; next; arg; res; operands; dbg; live; fdo }
 
 let from_basic (basic : Cfg.basic) : L.instruction_desc =
   match basic with

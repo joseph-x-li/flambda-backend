@@ -540,14 +540,14 @@ method mark_instr = function
 method select_operation op args _dbg =
   match (op, args) with
   | (Capply _, Cconst_symbol (func, _dbg) :: rem) ->
-    (Icall_imm { func; }, rem)
+    (Icall_imm { func; }, rem, [||])
   | (Capply _, _) ->
-    (Icall_ind, args)
+    (Icall_ind, args, [||])
   | (Cextcall { func; alloc; ty; ty_args; returns }, _) ->
-    Iextcall { func; alloc; ty_res = ty; ty_args; returns }, args
+    Iextcall { func; alloc; ty_res = ty; ty_args; returns }, args, [||]
   | (Cload (chunk, _mut), [arg]) ->
       let (addr, eloc) = self#select_addressing chunk arg in
-      (Iload(chunk, addr), [eloc])
+      (Iload(chunk, addr), [eloc], [||])
   | (Cstore (chunk, init), [arg1; arg2]) ->
       let (addr, eloc) = self#select_addressing chunk arg1 in
       let is_assign =
@@ -558,27 +558,27 @@ method select_operation op args _dbg =
       in
       if chunk = Word_int || chunk = Word_val then begin
         let (op, newarg2) = self#select_store is_assign addr arg2 in
-        (op, [newarg2; eloc])
+        (op, [newarg2; eloc], [||])
       end else begin
-        (Istore(chunk, addr, is_assign), [arg2; eloc])
+        (Istore(chunk, addr, is_assign), [arg2; eloc], [||])
         (* Inversion addr/datum in Istore *)
       end
-  | (Calloc, _) -> (Ialloc {bytes = 0; dbginfo = []}), args
+  | (Calloc, _) -> (Ialloc {bytes = 0; dbginfo = []}), args, [||]
   | (Caddi, _) -> self#select_arith_comm Iadd args
   | (Csubi, _) -> self#select_arith Isub args
   | (Cmuli, _) -> self#select_arith_comm Imul args
   | (Cmulhi { signed }, _) -> self#select_arith_comm (Imulh {signed}) args
-  | (Cdivi, _) -> (Iintop Idiv, args)
-  | (Cmodi, _) -> (Iintop Imod, args)
+  | (Cdivi, _) -> (Iintop Idiv, args, [||])
+  | (Cmodi, _) -> (Iintop Imod, args, [||])
   | (Cand, _) -> self#select_arith_comm Iand args
   | (Cor, _) -> self#select_arith_comm Ior args
   | (Cxor, _) -> self#select_arith_comm Ixor args
   | (Clsl, _) -> self#select_arith Ilsl args
   | (Clsr, _) -> self#select_arith Ilsr args
   | (Casr, _) -> self#select_arith Iasr args
-  | (Cclz {arg_is_non_zero}, _) -> (Iintop (Iclz{arg_is_non_zero}), args)
-  | (Cctz {arg_is_non_zero}, _) -> (Iintop (Ictz{arg_is_non_zero}), args)
-  | (Cpopcnt, _) -> (Iintop Ipopcnt, args)
+  | (Cclz {arg_is_non_zero}, _) -> (Iintop (Iclz{arg_is_non_zero}), args, [||])
+  | (Cctz {arg_is_non_zero}, _) -> (Iintop (Ictz{arg_is_non_zero}), args, [||])
+  | (Cpopcnt, _) -> (Iintop Ipopcnt, args, [||])
   | (Ccmpi comp, _) -> self#select_arith_comp (Isigned comp) args
   | (Caddv, _) -> self#select_arith_comm Iadd args
   | (Cadda, _) -> self#select_arith_comm Iadd args
@@ -590,69 +590,70 @@ method select_operation op args _dbg =
   | (Csubf, _) -> self#select_floatarith Isubf args
   | (Cmulf, _) -> self#select_floatarith Imulf args
   | (Cdivf, _) -> self#select_floatarith Idivf args
-  | (Cfloatofint, _) -> (Ifloatofint, args)
-  | (Cintoffloat, _) -> (Iintoffloat, args)
+  | (Cfloatofint, _) -> (Ifloatofint, args, [||])
+  | (Cintoffloat, _) -> (Iintoffloat, args, [||])
   | (Ccheckbound, _) ->
     self#select_arith Icheckbound args
   | (Cprobe { name; handler_code_sym; }, _) ->
-    Iprobe { name; handler_code_sym; }, args
-  | (Cprobe_is_enabled {name}, _) -> Iprobe_is_enabled {name}, []
+    Iprobe { name; handler_code_sym; }, args, [||]
+  | (Cprobe_is_enabled {name}, _) -> Iprobe_is_enabled {name}, [], [||]
   | _ -> Misc.fatal_error "Selection.select_oper"
 
 method private select_arith_comm op = function
   | [arg; Cconst_int (n, _)] when self#is_immediate op n ->
-      (Iintop_imm(op, n), [arg])
+      (Iintop_imm(op, n), [arg], [||])
   | [Cconst_int (n, _); arg] when self#is_immediate op n ->
-      (Iintop_imm(op, n), [arg])
+      (Iintop_imm(op, n), [arg], [||])
   | args ->
-      (Iintop op, args)
+      (Iintop op, args, [||])
 
 method private select_arith op = function
   | [arg; Cconst_int (n, _)] when self#is_immediate op n ->
-      (Iintop_imm(op, n), [arg])
+      (Iintop_imm(op, n), [arg], [||])
   | args ->
-      (Iintop op, args)
+      (Iintop op, args, [||])
 
 method private select_arith_comp cmp = function
   | [arg; Cconst_int (n, _)] when self#is_immediate (Icomp cmp) n ->
-      (Iintop_imm(Icomp cmp, n), [arg])
+      (Iintop_imm(Icomp cmp, n), [arg], [||])
   | [Cconst_int (n, _); arg]
     when self#is_immediate (Icomp(swap_intcomp cmp)) n ->
-      (Iintop_imm(Icomp(swap_intcomp cmp), n), [arg])
+      (Iintop_imm(Icomp(swap_intcomp cmp), n), [arg], [||])
   | args ->
-      (Iintop(Icomp cmp), args)
+      (Iintop(Icomp cmp), args, [||])
 
 method private select_floatarith op args =
-  (Ifloatop op, args)
+  (Ifloatop op, args, [||])
 
 method private select_floatarith_comp op args =
-  (Ifloatop(Icompf op), args)
+  (Ifloatop(Icompf op), args, [||])
 
 (* Instruction selection for conditionals *)
 
-method select_condition = function
+method select_condition cond =
+  match cond with
   | Cop(Ccmpi cmp, [arg1; Cconst_int (n, _)], _)
     when self#is_immediate_test (Isigned cmp) n ->
-      (Iinttest_imm(Isigned cmp, n), arg1)
+      (Iinttest_imm(Isigned cmp, n), arg1, [||])
   | Cop(Ccmpi cmp, [Cconst_int (n, _); arg2], _)
     when self#is_immediate_test (Isigned (swap_integer_comparison cmp)) n ->
-      (Iinttest_imm(Isigned(swap_integer_comparison cmp), n), arg2)
+      (Iinttest_imm(Isigned(swap_integer_comparison cmp), n), arg2, [||])
   | Cop(Ccmpi cmp, args, _) ->
-      (Iinttest(Isigned cmp), Ctuple args)
+      (Iinttest(Isigned cmp), Ctuple args, [||])
   | Cop(Ccmpa cmp, [arg1; Cconst_int (n, _)], _)
     when self#is_immediate_test (Iunsigned cmp) n ->
-      (Iinttest_imm(Iunsigned cmp, n), arg1)
+      (Iinttest_imm(Iunsigned cmp, n), arg1, [||])
   | Cop(Ccmpa cmp, [Cconst_int (n, _); arg2], _)
     when self#is_immediate_test (Iunsigned (swap_integer_comparison cmp)) n ->
-      (Iinttest_imm(Iunsigned(swap_integer_comparison cmp), n), arg2)
+      (Iinttest_imm(Iunsigned(swap_integer_comparison cmp), n), arg2, [||])
   | Cop(Ccmpa cmp, args, _) ->
-      (Iinttest(Iunsigned cmp), Ctuple args)
+      (Iinttest(Iunsigned cmp), Ctuple args, [||])
   | Cop(Ccmpf cmp, args, _) ->
-      (Ifloattest cmp, Ctuple args)
+      (Ifloattest cmp, Ctuple args, [||])
   | Cop(Cand, [arg; Cconst_int (1, _)], _) ->
-      (Ioddtest, arg)
+      (Ioddtest, arg, [||])
   | arg ->
-      (Itruetest, arg)
+      (Itruetest, arg, [||])
 
 (* Return an array of fresh registers of the given type.
    Normally implemented as Reg.createv, but some
@@ -665,11 +666,11 @@ method regs_for tys = Reg.createv tys
 
 val mutable instr_seq = dummy_instr
 
-method insert_debug _env desc dbg arg res =
-  instr_seq <- instr_cons_debug desc arg res dbg instr_seq
+method insert_debug _env desc dbg arg res operands =
+  instr_seq <- instr_cons_debug desc arg res operands dbg instr_seq
 
-method insert _env desc arg res =
-  instr_seq <- instr_cons desc arg res instr_seq
+method insert _env desc arg res operands =
+  instr_seq <- instr_cons desc arg res operands instr_seq
 
 method extract =
   let rec extract res i =
@@ -682,7 +683,7 @@ method extract =
 
 method insert_move env src dst =
   if src.stamp <> dst.stamp then
-    self#insert env (Iop Imove) [|src|] [|dst|]
+    self#insert env (Iop Imove) [|src|] [|dst|] [||]
 
 method insert_moves env src dst =
   for i = 0 to min (Array.length src) (Array.length dst) - 1 do
@@ -693,13 +694,13 @@ method insert_moves env src dst =
 
 method insert_move_args env arg loc stacksize =
   if stacksize <> 0 then begin
-    self#insert env (Iop(Istackoffset stacksize)) [||] [||]
+    self#insert env (Iop(Istackoffset stacksize)) [||] [||] [||]
   end;
   self#insert_moves env arg loc
 
 method insert_move_results env loc res stacksize =
   if stacksize <> 0 then begin
-    self#insert env (Iop(Istackoffset(-stacksize))) [||] [||]
+    self#insert env (Iop(Istackoffset(-stacksize))) [||] [||] [||]
   end;
   self#insert_moves env loc res
 
@@ -707,12 +708,12 @@ method insert_move_results env loc res stacksize =
    to insert moves before and after the operation, i.e. for two-address
    instructions, or instructions using dedicated registers. *)
 
-method insert_op_debug env op dbg rs rd =
-  self#insert_debug env (Iop op) dbg rs rd;
+method insert_op_debug env op dbg rs rd operands =
+  self#insert_debug env (Iop op) dbg rs rd operands;
   rd
 
-method insert_op env op rs rd =
-  self#insert_op_debug env op Debuginfo.none rs rd
+method insert_op env op rs rd operands =
+  self#insert_op_debug env op Debuginfo.none rs rd operands
 
 (* Add the instructions for the given expression
    at the end of the self sequence *)
@@ -721,13 +722,13 @@ method emit_expr (env:environment) exp =
   match exp with
     Cconst_int (n, _dbg) ->
       let r = self#regs_for typ_int in
-      Some(self#insert_op env (Iconst_int(Nativeint.of_int n)) [||] r)
+      Some(self#insert_op env (Iconst_int(Nativeint.of_int n)) [||] r [||])
   | Cconst_natint (n, _dbg) ->
       let r = self#regs_for typ_int in
-      Some(self#insert_op env (Iconst_int n) [||] r)
+      Some(self#insert_op env (Iconst_int n) [||] r [||])
   | Cconst_float (n, _dbg) ->
       let r = self#regs_for typ_float in
-      Some(self#insert_op env (Iconst_float (Int64.bits_of_float n)) [||] r)
+      Some(self#insert_op env (Iconst_float (Int64.bits_of_float n)) [||] r [||])
   | Cconst_symbol (n, _dbg) ->
       (* Cconst_symbol _ evaluates to a statically-allocated address, so its
          value fits in a typ_int register and is never changed by the GC.
@@ -737,7 +738,7 @@ method emit_expr (env:environment) exp =
          registered in the compilation unit's global roots structure, so
          adding this register to the frame table would be redundant *)
       let r = self#regs_for typ_int in
-      Some(self#insert_op env (Iconst_symbol n) [||] r)
+      Some(self#insert_op env (Iconst_symbol n) [||] r [||])
   | Cvar v ->
       begin try
         Some(env_find v env)
@@ -780,8 +781,8 @@ method emit_expr (env:environment) exp =
         None -> None
       | Some r1 ->
           let rd = [|Proc.loc_exn_bucket|] in
-          self#insert env (Iop Imove) r1 rd;
-          self#insert_debug env  (Iraise k) dbg rd [||];
+          self#insert env (Iop Imove) r1 rd [||];
+          self#insert_debug env  (Iraise k) dbg rd [||] [||];
           set_traps_for_raise env;
           None
       end
@@ -790,14 +791,15 @@ method emit_expr (env:environment) exp =
         None -> None
       | Some (simple_args, env) ->
          let rs = self#emit_tuple env simple_args in
-         Some (self#insert_op_debug env Iopaque dbg rs rs)
+         Some (self#insert_op_debug env Iopaque dbg rs rs [||])
       end
   | Cop(op, args, dbg) ->
       begin match self#emit_parts_list env args with
         None -> None
       | Some(simple_args, env) ->
           let ty = oper_result_type op in
-          let (new_op, new_args) = self#select_operation op simple_args dbg in
+          let (new_op, new_args, operands) =
+            self#select_operation op simple_args dbg in
           match new_op with
             Icall_ind ->
               let r1 = self#emit_tuple env new_args in
@@ -807,7 +809,7 @@ method emit_expr (env:environment) exp =
               let loc_res = Proc.loc_results (Reg.typv rd) in
               self#insert_move_args env rarg loc_arg stack_ofs;
               self#insert_debug env (Iop new_op) dbg
-                          (Array.append [|r1.(0)|] loc_arg) loc_res;
+                          (Array.append [|r1.(0)|] loc_arg) loc_res operands;
               self#insert_move_results env loc_res rd stack_ofs;
               set_traps_for_raise env;
               Some rd
@@ -817,7 +819,7 @@ method emit_expr (env:environment) exp =
               let (loc_arg, stack_ofs) = Proc.loc_arguments (Reg.typv r1) in
               let loc_res = Proc.loc_results (Reg.typv rd) in
               self#insert_move_args env r1 loc_arg stack_ofs;
-              self#insert_debug env (Iop new_op) dbg loc_arg loc_res;
+              self#insert_debug env (Iop new_op) dbg loc_arg loc_res operands;
               self#insert_move_results env loc_res rd stack_ofs;
               set_traps_for_raise env;
               Some rd
@@ -827,7 +829,7 @@ method emit_expr (env:environment) exp =
               let rd = self#regs_for ty in
               let loc_res =
                 self#insert_op_debug env new_op dbg
-                  loc_arg (Proc.loc_external_results (Reg.typv rd)) in
+                  loc_arg (Proc.loc_external_results (Reg.typv rd)) operands in
               self#insert_move_results env loc_res rd stack_ofs;
               set_traps_for_raise env;
               if returns then Some rd else None
@@ -839,20 +841,20 @@ method emit_expr (env:environment) exp =
               let op =
                 Ialloc { bytes; dbginfo = [{alloc_words; alloc_dbg = dbg}] }
               in
-              self#insert_debug env (Iop op) dbg [||] rd;
+              self#insert_debug env (Iop op) dbg [||] rd [||];
               self#emit_stores env new_args rd;
               set_traps_for_raise env;
               Some rd
           | Iprobe _ ->
               let r1 = self#emit_tuple env new_args in
               let rd = self#regs_for ty in
-              let rd = self#insert_op_debug env new_op dbg r1 rd in
+              let rd = self#insert_op_debug env new_op dbg r1 rd operands in
               set_traps_for_raise env;
               Some rd
           | op ->
               let r1 = self#emit_tuple env new_args in
               let rd = self#regs_for ty in
-              Some (self#insert_op_debug env op dbg r1 rd)
+              Some (self#insert_op_debug env op dbg r1 rd operands)
       end
   | Csequence(e1, e2) ->
       begin match self#emit_expr env e1 with
@@ -860,7 +862,7 @@ method emit_expr (env:environment) exp =
       | Some _ -> self#emit_expr env e2
       end
   | Cifthenelse(econd, _ifso_dbg, eif, _ifnot_dbg, eelse, _dbg) ->
-      let (cond, earg) = self#select_condition econd in
+      let (cond, earg, operands) = self#select_condition econd in
       begin match self#emit_expr env earg with
         None -> None
       | Some rarg ->
@@ -868,7 +870,7 @@ method emit_expr (env:environment) exp =
           let (relse, selse) = self#emit_sequence env eelse in
           let r = join env rif sif relse selse in
           self#insert env (Iifthenelse(cond, sif#extract, selse#extract))
-                      rarg [||];
+                      rarg [||] operands;
           r
       end
   | Cswitch(esel, index, ecases, _dbg) ->
@@ -881,7 +883,7 @@ method emit_expr (env:environment) exp =
           let r = join_array env rscases in
           self#insert env (Iswitch(index,
                                    Array.map (fun (_, s) -> s#extract) rscases))
-                      rsel [||];
+                      rsel [||] [||];
           r
       end
   | Ccatch(_, [], e1) ->
@@ -959,7 +961,7 @@ method emit_expr (env:environment) exp =
       in
       self#insert env
         (Icatch (rec_flag, final_trap_stack, List.map aux l, s_body#extract))
-        [||] [||];
+        [||] [||] [||];
       r
   | Cexit (lbl,args,traps) ->
       begin match self#emit_parts_list env args with
@@ -981,7 +983,7 @@ method emit_expr (env:environment) exp =
               Array.iter (fun reg -> assert(reg.typ <> Addr)) src;
               self#insert_moves env src tmp_regs ;
               self#insert_moves env tmp_regs (Array.concat dest_args) ;
-              self#insert env (Iexit (nfail, traps)) [||] [||];
+              self#insert env (Iexit (nfail, traps)) [||] [||] [||];
               set_traps nfail trap_stack env.trap_stack traps;
               None
           | Return_lbl ->
@@ -1006,9 +1008,9 @@ method emit_expr (env:environment) exp =
         self#insert env
           (Itrywith(s1#extract, kind,
                     (env_handler.trap_stack,
-                     instr_cons (Iop Imove) [|Proc.loc_exn_bucket|] rv
+                     instr_cons (Iop Imove) [|Proc.loc_exn_bucket|] rv [||]
                        (s2#extract))))
-          [||] [||];
+          [||] [||] [||];
         r
       in
       let env = env_add v rv env in
@@ -1164,7 +1166,7 @@ method emit_extcall_args env ty_args args =
   let locs, stack_ofs = Proc.loc_external_arguments ty_args in
   let ty_args = Array.of_list ty_args in
   if stack_ofs <> 0 then
-    self#insert env (Iop(Istackoffset stack_ofs)) [||] [||];
+    self#insert env (Iop(Istackoffset stack_ofs)) [||] [||] [||];
   List.iteri
     (fun i arg ->
       self#insert_move_extcall_arg env ty_args.(i) arg locs.(i))
@@ -1194,11 +1196,11 @@ method emit_stores env data regs_addr =
                 let kind = if r.typ = Float then Double else Word_val in
                 self#insert env
                             (Iop(Istore(kind, !a, false)))
-                            (Array.append [|r|] regs_addr) [||];
+                            (Array.append [|r|] regs_addr) [||] [||];
                 a := Arch.offset_addressing !a (size_component r.typ)
               done
           | _ ->
-              self#insert env (Iop op) (Array.append regs regs_addr) [||];
+              self#insert env (Iop op) (Array.append regs regs_addr) [||] [||];
               a := Arch.offset_addressing !a (size_expr env e))
     data
 
@@ -1210,7 +1212,7 @@ method private emit_return (env:environment) exp (traps:trap_action list) =
   | Some r ->
       let loc = Proc.loc_results (Reg.typv r) in
       self#insert_moves env r loc;
-      self#insert env (Ireturn traps) loc [||]
+      self#insert env (Ireturn traps) loc [||] [||]
 
 method emit_tail (env:environment) exp =
   match exp with
@@ -1230,7 +1232,8 @@ method emit_tail (env:environment) exp =
       begin match self#emit_parts_list env args with
         None -> ()
       | Some(simple_args, env) ->
-          let (new_op, new_args) = self#select_operation op simple_args dbg in
+          let (new_op, new_args, operands) =
+            self#select_operation op simple_args dbg in
           match new_op with
             Icall_ind ->
               let r1 = self#emit_tuple env new_args in
@@ -1240,16 +1243,16 @@ method emit_tail (env:environment) exp =
                 let call = Iop (Itailcall_ind) in
                 self#insert_moves env rarg loc_arg;
                 self#insert_debug env call dbg
-                            (Array.append [|r1.(0)|] loc_arg) [||];
+                            (Array.append [|r1.(0)|] loc_arg) [||] [||];
               end else begin
                 let rd = self#regs_for ty in
                 let loc_res = Proc.loc_results (Reg.typv rd) in
                 self#insert_move_args env rarg loc_arg stack_ofs;
                 self#insert_debug env (Iop new_op) dbg
-                            (Array.append [|r1.(0)|] loc_arg) loc_res;
+                            (Array.append [|r1.(0)|] loc_arg) loc_res operands;
                 set_traps_for_raise env;
-                self#insert env (Iop(Istackoffset(-stack_ofs))) [||] [||];
-                self#insert env (Ireturn (pop_all_traps env)) loc_res [||]
+                self#insert env (Iop(Istackoffset(-stack_ofs))) [||] [||] [||];
+                self#insert env (Ireturn (pop_all_traps env)) loc_res [||] [||]
               end
           | Icall_imm { func; } ->
               let r1 = self#emit_tuple env new_args in
@@ -1257,20 +1260,20 @@ method emit_tail (env:environment) exp =
               if stack_ofs = 0 && trap_stack_is_empty env then begin
                 let call = Iop (Itailcall_imm { func; }) in
                 self#insert_moves env r1 loc_arg;
-                self#insert_debug env call dbg loc_arg [||];
+                self#insert_debug env call dbg loc_arg [||] [||];
               end else if func = !current_function_name && trap_stack_is_empty env then begin
                 let call = Iop (Itailcall_imm { func; }) in
                 let loc_arg' = Proc.loc_parameters (Reg.typv r1) in
                 self#insert_moves env r1 loc_arg';
-                self#insert_debug env call dbg loc_arg' [||];
+                self#insert_debug env call dbg loc_arg' [||] [||];
               end else begin
                 let rd = self#regs_for ty in
                 let loc_res = Proc.loc_results (Reg.typv rd) in
                 self#insert_move_args env r1 loc_arg stack_ofs;
-                self#insert_debug env (Iop new_op) dbg loc_arg loc_res;
+                self#insert_debug env (Iop new_op) dbg loc_arg loc_res operands;
                 set_traps_for_raise env;
-                self#insert env (Iop(Istackoffset(-stack_ofs))) [||] [||];
-                self#insert env (Ireturn (pop_all_traps env)) loc_res [||]
+                self#insert env (Iop(Istackoffset(-stack_ofs))) [||] [||] [||];
+                self#insert env (Ireturn (pop_all_traps env)) loc_res [||] [||]
               end
           | _ -> Misc.fatal_error "Selection.emit_tail"
       end
@@ -1280,14 +1283,14 @@ method emit_tail (env:environment) exp =
       | Some _ -> self#emit_tail env e2
       end
   | Cifthenelse(econd, _ifso_dbg, eif, _ifnot_dbg, eelse, _dbg) ->
-      let (cond, earg) = self#select_condition econd in
+      let (cond, earg, operands) = self#select_condition econd in
       begin match self#emit_expr env earg with
         None -> ()
       | Some rarg ->
           self#insert env
                       (Iifthenelse(cond, self#emit_tail_sequence env eif,
                                          self#emit_tail_sequence env eelse))
-                      rarg [||]
+                      rarg [||] operands
       end
   | Cswitch(esel, index, ecases, _dbg) ->
       begin match self#emit_expr env esel with
@@ -1297,7 +1300,7 @@ method emit_tail (env:environment) exp =
             Array.map (fun (case, _dbg) -> self#emit_tail_sequence env case)
               ecases
           in
-          self#insert env (Iswitch (index, cases)) rsel [||]
+          self#insert env (Iswitch (index, cases)) rsel [||] [||]
       end
   | Ccatch(_, [], e1) ->
       self#emit_tail env e1
@@ -1352,7 +1355,7 @@ method emit_tail (env:environment) exp =
       in
       (* The final trap stack doesn't matter, as it's not reachable. *)
       self#insert env (Icatch(rec_flag, env.trap_stack, new_handlers, s_body))
-        [||] [||]
+        [||] [||] [||]
   | Ctrywith(e1, kind, v, e2, _dbg) ->
       let env_body = env_enter_trywith env kind in
       let s1 = self#emit_tail_sequence env_body e1 in
@@ -1362,8 +1365,9 @@ method emit_tail (env:environment) exp =
         self#insert env
           (Itrywith(s1, kind,
                     (env_handler.trap_stack,
-                     instr_cons (Iop Imove) [|Proc.loc_exn_bucket|] rv s2)))
-          [||] [||]
+                     instr_cons (Iop Imove) [|Proc.loc_exn_bucket|] rv
+                       [||] s2)))
+          [||] [||] [||]
       in
       let env = env_add v rv env in
       begin match kind with

@@ -327,6 +327,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
             next = insn;
             arg = [| |];
             res = [| |];
+            operands = [| |];
             dbg = insn.dbg;
             fdo = insn.fdo;
             live = insn.live;

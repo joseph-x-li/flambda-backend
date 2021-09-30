@@ -81,9 +81,11 @@ class virtual selector_generic : object
     Cmm.operation ->
     Cmm.expression list ->
     Debuginfo.t ->
-    Mach.operation * Cmm.expression list
+    Mach.operation * Cmm.expression list * Mach.operand array
     (* Can be overridden to deal with special arithmetic instructions *)
-  method select_condition : Cmm.expression -> Mach.test * Cmm.expression
+  method select_condition :
+    Cmm.expression ->
+    Mach.test * Cmm.expression * Mach.operand array
     (* Can be overridden to deal with special test instructions *)
   method select_store :
     bool -> Arch.addressing_mode -> Cmm.expression ->
@@ -95,12 +97,13 @@ class virtual selector_generic : object
        Can be overridden if float values are stored as pairs of
        integer registers. *)
   method insert_op :
-    environment -> Mach.operation -> Reg.t array -> Reg.t array -> Reg.t array
+    environment -> Mach.operation -> Reg.t array -> Reg.t array
+      -> Mach.operand array -> Reg.t array
     (* Can be overridden to deal with 2-address instructions
        or instructions with hardwired input/output registers *)
   method insert_op_debug :
     environment -> Mach.operation -> Debuginfo.t -> Reg.t array
-      -> Reg.t array -> Reg.t array
+      -> Reg.t array -> Mach.operand array -> Reg.t array
     (* Can be overridden to deal with 2-address instructions
        or instructions with hardwired input/output registers *)
   method insert_move_extcall_arg :
@@ -148,10 +151,11 @@ class virtual selector_generic : object
      are not always applied to "self", but ideally they should be private. *)
   method extract : Mach.instruction
   method insert :
-    environment -> Mach.instruction_desc -> Reg.t array -> Reg.t array -> unit
+    environment -> Mach.instruction_desc -> Reg.t array -> Reg.t array ->
+    Mach.operand array -> unit
   method insert_debug :
     environment -> Mach.instruction_desc -> Debuginfo.t ->
-      Reg.t array -> Reg.t array -> unit
+      Reg.t array -> Reg.t array -> Mach.operand array -> unit
   method insert_move : environment -> Reg.t -> Reg.t -> unit
   method insert_move_args :
     environment -> Reg.t array -> Reg.t array -> int -> unit

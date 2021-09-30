@@ -77,11 +77,17 @@ type operation =
   | Iprobe of { name: string; handler_code_sym: string; }
   | Iprobe_is_enabled of { name: string }
 
+type operand =
+  | Iimm of int
+  | Ireg of int
+  | Imem of Arch.addressing_mode * int
+
 type instruction =
   { desc: instruction_desc;
     next: instruction;
     arg: Reg.t array;
     res: Reg.t array;
+    operands: operand array;
     dbg: Debuginfo.t;
     mutable live: Reg.Set.t;
     mutable available_before: Reg_availability_set.t;
@@ -114,6 +120,7 @@ let rec dummy_instr =
     next = dummy_instr;
     arg = [||];
     res = [||];
+    operands = [||];
     dbg = Debuginfo.none;
     live = Reg.Set.empty;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
@@ -125,21 +132,23 @@ let end_instr () =
     next = dummy_instr;
     arg = [||];
     res = [||];
+    operands = [||];
     dbg = Debuginfo.none;
     live = Reg.Set.empty;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
     available_across = None;
   }
 
-let instr_cons d a r n =
-  { desc = d; next = n; arg = a; res = r;
+let instr_cons d a r o n =
+  { desc = d; next = n; arg = a; res = r; operands = o;
     dbg = Debuginfo.none; live = Reg.Set.empty;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
     available_across = None;
   }
 
-let instr_cons_debug d a r dbg n =
+let instr_cons_debug d a r o dbg n =
   { desc = d; next = n; arg = a; res = r; dbg = dbg; live = Reg.Set.empty;
+    operands = o;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
     available_across = None;
   }
