@@ -70,21 +70,15 @@ type prefetch_temporal_locality_hint = Nonlocal | Low | Moderate | High
 type prefetch_info = {
   is_write: bool;
   locality: prefetch_temporal_locality_hint;
-  addr: addressing_mode;
 }
 
 type rounding_mode = Half_to_even | Down | Up | Towards_zero | Current
 
 type specific_operation =
-    Ilea of addressing_mode             (* "lea" gives scaled adds *)
-  | Istore_int of nativeint * addressing_mode * bool
-                                        (* Store an integer constant *)
-  | Ioffset_loc of int * addressing_mode (* Add a constant to a location *)
-  | Ifloatarithmem of float_operation * addressing_mode
-                                       (* Float arith operation with memory *)
+    Ilea                               (* "lea" gives scaled adds *)
+  | Ioffset_loc                        (* Add a constant to a location *)
   | Ibswap of int                      (* endianness conversion *)
   | Isqrtf                             (* Float square root *)
-  | Ifloatsqrtf of addressing_mode     (* Float square root from memory *)
   | Ifloat_iround                      (* Rounds a [float] to an [int64]
                                           using the current rounding mode *)
   | Ifloat_round of rounding_mode      (* Round [float] to an integer [float]
@@ -101,7 +95,6 @@ type specific_operation =
   | Iprefetch of                       (* memory prefetching hint *)
       { is_write: bool;
         locality: prefetch_temporal_locality_hint;
-        addr: addressing_mode;
       }
 
 and float_operation =
@@ -174,51 +167,54 @@ let print_addressing printreg addr ppf arg =
       let idx = if n <> 0 then Printf.sprintf " + %i" n else "" in
       fprintf ppf "%a + %a * %i%s" printreg arg.(0) printreg arg.(1) scale idx
 
-let print_specific_operation printreg op ppf arg =
+let print_specific_operation_name op =
   match op with
-  | Ilea addr -> print_addressing printreg addr ppf arg
-  | Istore_int(n, addr, is_assign) ->
-      fprintf ppf "[%a] := %nd %s"
-         (print_addressing printreg addr) arg n
-         (if is_assign then "(assign)" else "(init)")
-  | Ioffset_loc(n, addr) ->
-      fprintf ppf "[%a] +:= %i" (print_addressing printreg addr) arg n
+  | Ilea -> "lea"
+  | Ioffset_loc -> "offset_loc"
+  | Isqrtf -> "sqrtf"
+  | Ifloat_iround -> "float_iround"
+  | Ifloat_round mode -> "float_round"
+  | Ifloat_min -> "float_min"
+  | Ifloat_max -> "float_max"
+  | Ibswap _ -> "bswap"
+  | Isextend32 -> "sextend32"
+  | Izextend32 -> "zextend32"
+  | Irdtsc -> "rdtsc"
+  | Irdpmc -> "rdpmc"
+  | Icrc32q -> "crc32"
+  | Iprefetch _ -> "prefetch"
+
+let print_specific_operation printreg printoperand op ppf arg =
+  match op with
+  | Ilea -> printoperand ppf arg.(0)
+  | Ioffset_loc ->
+      fprintf ppf "[%a] +:= %a" printoperand arg.(0) printoperand arg.(1)
   | Isqrtf ->
-      fprintf ppf "sqrtf %a" printreg arg.(0)
-  | Ifloat_iround -> fprintf ppf "float_iround %a" printreg arg.(0)
+      fprintf ppf "sqrtf %a" printoperand arg.(0)
+  | Ifloat_iround -> fprintf ppf "float_iround %a" printoperand arg.(0)
   | Ifloat_round mode ->
      fprintf ppf "float_round %s %a" (string_of_rounding_mode mode)
-       printreg arg.(0)
-  | Ifloat_min -> fprintf ppf "float_min %a %a" printreg arg.(0) printreg arg.(1)
-  | Ifloat_max -> fprintf ppf "float_max %a %a" printreg arg.(0) printreg arg.(1)
-  | Ifloatsqrtf addr ->
-     fprintf ppf "sqrtf float64[%a]"
-             (print_addressing printreg addr) [|arg.(0)|]
-  | Ifloatarithmem(op, addr) ->
-      let op_name = function
-      | Ifloatadd -> "+f"
-      | Ifloatsub -> "-f"
-      | Ifloatmul -> "*f"
-      | Ifloatdiv -> "/f" in
-      fprintf ppf "%a %s float64[%a]" printreg arg.(0) (op_name op)
-                   (print_addressing printreg addr)
-                   (Array.sub arg 1 (Array.length arg - 1))
+       printoperand arg.(0)
+  | Ifloat_min -> fprintf ppf "float_min %a %a"
+                    printoperand arg.(0) printoperand arg.(1)
+  | Ifloat_max -> fprintf ppf "float_max %a %a"
+                    printoperand arg.(0) printoperand arg.(1)
   | Ibswap i ->
-      fprintf ppf "bswap_%i %a" i printreg arg.(0)
+      fprintf ppf "bswap_%i %a" i printoperand arg.(0)
   | Isextend32 ->
-      fprintf ppf "sextend32 %a" printreg arg.(0)
+      fprintf ppf "sextend32 %a" printoperand arg.(0)
   | Izextend32 ->
-      fprintf ppf "zextend32 %a" printreg arg.(0)
+      fprintf ppf "zextend32 %a" printoperand arg.(0)
   | Irdtsc ->
       fprintf ppf "rdtsc"
   | Irdpmc ->
-      fprintf ppf "rdpmc %a" printreg arg.(0)
+      fprintf ppf "rdpmc %a" printoperand arg.(0)
   | Icrc32q ->
-      fprintf ppf "crc32 %a %a" printreg arg.(0) printreg arg.(1)
+      fprintf ppf "crc32 %a %a" printoperand arg.(0) printoperand arg.(1)
   | Iprefetch { is_write; locality; } ->
       fprintf ppf "prefetch is_write=%b prefetch_temporal_locality_hint=%s %a"
         is_write (string_of_prefetch_temporal_locality_hint locality)
-        printreg arg.(0)
+        printoperand arg.(0)
 
 let win64 =
   match Config.system with
@@ -228,9 +224,9 @@ let win64 =
 open X86_ast
 
 (* Certain float conditions aren't represented directly in the opcode for
-   float comparison, so we have to swap the arguments. The swap information
+   cmpsd, so we have to swap the arguments. The swap information
    is also needed downstream because one of the arguments is clobbered. *)
-let float_cond_and_need_swap cond =
+let float_compare_and_need_swap cond =
   match (cond : Lambda.float_comparison) with
   | CFeq  -> EQf,  false
   | CFneq -> NEQf, false
@@ -243,6 +239,11 @@ let float_cond_and_need_swap cond =
   | CFge  -> LEf,  true
   | CFnge -> NLEf, true
 
+(* CR gyorsh: This referring to Lambda is horrible,
+   but CMM creates a dependency cycle.  *)
+let float_test_need_swap : Lambda.float_comparison -> bool = function
+  | CFlt | CFnlt | CFle  | CFnle -> true
+  | CFeq | CFneq | CFgt | CFngt | CFge | CFnge -> false
 
 let equal_addressing_mode left right =
   match left, right with
@@ -286,19 +287,13 @@ let equal_rounding_mode left right =
 
 let equal_specific_operation left right =
   match left, right with
-  | Ilea x, Ilea y -> equal_addressing_mode x y
-  | Istore_int (x, x', x''), Istore_int (y, y', y'') ->
-    Nativeint.equal x y && equal_addressing_mode x' y' && Bool.equal x'' y''
-  | Ioffset_loc (x, x'), Ioffset_loc (y, y') ->
-    Int.equal x y && equal_addressing_mode x' y'
-  | Ifloatarithmem (x, x'), Ifloatarithmem (y, y') ->
-    equal_float_operation x y && equal_addressing_mode x' y'
+  | Ilea, Ilea -> true
+  | Ioffset_loc, Ioffset_loc ->
+    true
   | Ibswap left, Ibswap right ->
     Int.equal left right
   | Isqrtf, Isqrtf ->
     true
-  | Ifloatsqrtf left, Ifloatsqrtf right ->
-    equal_addressing_mode left right
   | Isextend32, Isextend32 ->
     true
   | Izextend32, Izextend32 ->
@@ -313,13 +308,12 @@ let equal_specific_operation left right =
   | Ifloat_round x, Ifloat_round y -> equal_rounding_mode x y
   | Ifloat_min, Ifloat_min -> true
   | Ifloat_max, Ifloat_max -> true
-  | Iprefetch { is_write = left_is_write; locality = left_locality; addr = left_addr; },
-    Iprefetch { is_write = right_is_write; locality = right_locality; addr = right_addr; } ->
+  | Iprefetch { is_write = left_is_write; locality = left_locality; },
+    Iprefetch { is_write = right_is_write; locality = right_locality; } ->
     Bool.equal left_is_write right_is_write
     && equal_prefetch_temporal_locality_hint left_locality right_locality
-    && equal_addressing_mode left_addr right_addr
-  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
-    | Isqrtf | Ifloatsqrtf _ | Isextend32 | Izextend32 | Irdtsc | Irdpmc
+  | (Ilea | Ioffset_loc | Ibswap _
+    | Isqrtf | Isextend32 | Izextend32 | Irdtsc | Irdpmc
     | Ifloat_iround | Ifloat_round _ | Ifloat_min | Ifloat_max
     | Icrc32q | Iprefetch _), _ ->
     false

@@ -51,7 +51,7 @@ module S = struct
         { bytes : int;
           dbginfo : Debuginfo.alloc_dbginfo
         }
-    | Checkbound of { immediate : int option }
+    | Checkbound
 
   type operation =
     | Move
@@ -62,9 +62,8 @@ module S = struct
     | Const_symbol of string
     | Stackoffset of int
     | Load of Cmm.memory_chunk * Arch.addressing_mode
-    | Store of Cmm.memory_chunk * Arch.addressing_mode * bool
+    | Store of bool
     | Intop of Mach.integer_operation
-    | Intop_imm of Mach.integer_operation * int
     | Floatop of Mach.float_operation
     | Floatofint
     | Intoffloat
@@ -100,8 +99,7 @@ module S = struct
     { lt : Label.t;  (** if x < y (resp. x < n) goto [lt] label *)
       eq : Label.t;  (** if x = y (resp. x = n) goto [eq] label *)
       gt : Label.t;  (** if x > y (resp. x > n) goto [gt] label *)
-      is_signed : bool;
-      imm : int option
+      is_signed : bool
     }
 
   (** [float_test] represents possible outcomes of comparison between arguments
@@ -117,8 +115,8 @@ module S = struct
 
   type 'a instruction =
     { desc : 'a;
-      arg : Reg.t array;
       res : Reg.t array;
+      operands : Mach.operand array;
       dbg : Debuginfo.t;
       fdo : Fdo_info.t;
       live : Reg.Set.t;

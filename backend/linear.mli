@@ -20,8 +20,8 @@ type label = Cmm.label
 type instruction =
   { mutable desc: instruction_desc;
     mutable next: instruction;
-    arg: Reg.t array;
     res: Reg.t array;
+    operands: Mach.operand array;
     dbg: Debuginfo.t;
     fdo: Fdo_info.t;
     live: Reg.Set.t }
@@ -46,7 +46,8 @@ and instruction_desc =
 val has_fallthrough :  instruction_desc -> bool
 val end_instr: instruction
 val instr_cons:
-  instruction_desc -> Reg.t array -> Reg.t array -> instruction -> instruction
+  instruction_desc -> Reg.t array -> Mach.operand array ->
+  instruction -> instruction
 val invert_test: Mach.test -> Mach.test
 
 type fundecl =

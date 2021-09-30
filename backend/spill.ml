@@ -111,23 +111,23 @@ let spill_reg env r =
     { env with spill_env = Reg.Map.add r spill_r env.spill_env; },
     spill_r
 
-let record_use env regv =
-  let use_date = Array.fold_left (fun use_date r ->
+let record_use env regset =
+  let use_date = Reg.Set.fold (fun r use_date ->
       let prev_date = try Reg.Map.find r use_date with Not_found -> 0 in
       if env.current_date > prev_date then
         Reg.Map.add r env.current_date use_date
       else
         use_date)
-    env.use_date regv
+    regset env.use_date
   in
   { env with use_date; }
 
 (* Check if the register pressure overflows the maximum pressure allowed
    at that point. If so, spill enough registers to lower the pressure. *)
 
-let add_superpressure_regs env op live_regs res_regs spilled =
-  let max_pressure = Proc.max_register_pressure op in
-  let regs = Reg.add_set_array live_regs res_regs in
+let add_superpressure_regs env i spilled =
+  let max_pressure = Proc.max_register_pressure i in
+  let regs = Reg.add_set_array i.live i.res in
   (* Compute the pressure in each register class *)
   let pressure = Array.make Proc.num_register_classes 0 in
   Reg.Set.iter
@@ -164,7 +164,7 @@ let add_superpressure_regs env op live_regs res_regs spilled =
             with Not_found ->                 (* Should not happen *)
               ()
           end)
-        live_regs;
+        i.live;
       if !lru_reg != Reg.dummy then begin
         pressure.(cl) <- pressure.(cl) - 1;
         check_pressure cl (Reg.Set.add !lru_reg spilled)
@@ -182,7 +182,7 @@ let add_reloads env regset i =
     (fun r (env, i) ->
        let env, r' = spill_reg env r in
        env,
-       instr_cons (Iop Ireload) [|r'|] [|r|] i)
+       instr_cons (Iop Ireload) [|Ireg r'|] [|r|] i)
     regset (env, i)
 
 let find_reload_at_exit env k =
@@ -203,22 +203,22 @@ let find_in_reload_cache nfail env =
 
 let rec reload env i before =
   let env = { env with current_date = succ env.current_date; } in
-  let env = record_use env i.arg in
-  let env = record_use env i.res in
+  let env = record_use env (Mach.arg_regset i.operands) in
+  let env = record_use env (Reg.set_of_array i.res) in
   match i.desc with
     Iend ->
       (i, before, env)
   | Ireturn _ | Iop Itailcall_ind | Iop(Itailcall_imm _) ->
       let env, i =
-        add_reloads env (Reg.inter_set_array before i.arg) i
+        add_reloads env (Reg.Set.inter before (Mach.arg_regset i.operands)) i
       in
        (i, Reg.Set.empty, env)
   | Iop(Icall_ind | Icall_imm _ | Iextcall { alloc = true; }) ->
       (* All regs live across must be spilled *)
       let (new_next, finally, env) = reload env i.next i.live in
       let env, i =
-        add_reloads env (Reg.inter_set_array before i.arg)
-          (instr_cons_debug i.desc i.arg i.res i.dbg new_next)
+        add_reloads env (Reg.Set.inter before (Mach.arg_regset i.operands))
+          (instr_cons_debug i.desc i.operands i.res  i.dbg new_next)
       in
        (i, finally, env)
   | Iop op ->
@@ -228,17 +228,19 @@ let rec reload env i before =
            (Reg.Set.cardinal i.live + Array.length i.res <=
             Proc.safe_register_pressure op)
         then before
-        else add_superpressure_regs env op i.live i.res before in
+        else add_superpressure_regs env i before in
       let after =
-        Reg.diff_set_array (Reg.diff_set_array new_before i.arg) i.res in
+        Reg.diff_set_array
+          (Reg.Set.diff new_before (Mach.arg_regset i.operands))
+          i.res in
       let (new_next, finally, env) = reload env i.next after in
       let env, i =
-        add_reloads env (Reg.inter_set_array new_before i.arg)
-          (instr_cons_debug i.desc i.arg i.res i.dbg new_next)
+        add_reloads env (Reg.Set.inter new_before (Mach.arg_regset i.operands))
+          (instr_cons_debug i.desc i.operands i.res i.dbg new_next)
       in
       (i, finally, env)
   | Iifthenelse(test, ifso, ifnot) ->
-      let at_fork = Reg.diff_set_array before i.arg in
+      let at_fork = Reg.Set.diff before (Mach.arg_regset i.operands) in
       let (new_ifso, after_ifso, env_ifso) = reload env ifso at_fork in
       let env =
         { env_ifso with current_date = env.current_date; }
@@ -253,18 +255,18 @@ let rec reload env i before =
         reload env i.next (Reg.Set.union after_ifso after_ifnot) in
       let new_i =
         instr_cons (Iifthenelse(test, new_ifso, new_ifnot))
-        i.arg i.res new_next in
+          i.operands i.res new_next in
       let env =
         { env with destroyed_at_fork =
                      (new_i, at_fork) :: env.destroyed_at_fork;
         }
       in
       let env, i =
-        add_reloads env (Reg.inter_set_array before i.arg) new_i
+        add_reloads env (Reg.Set.inter before (Mach.arg_regset i.operands)) new_i
       in
       (i, finally, env)
   | Iswitch(index, cases) ->
-      let at_fork = Reg.diff_set_array before i.arg in
+      let at_fork = Reg.Set.diff before (Mach.arg_regset i.operands) in
       let date_fork = env.current_date in
       let new_cases_list, env, after_cases =
         Array.fold_left (fun (new_cases_list, env, after_cases) c ->
@@ -282,9 +284,9 @@ let rec reload env i before =
       in
       let (new_next, finally, env) = reload env i.next after_cases in
       let env, i =
-        add_reloads env (Reg.inter_set_array before i.arg)
+        add_reloads env (Reg.Set.inter before (Mach.arg_regset i.operands))
           (instr_cons (Iswitch(index, new_cases))
-             i.arg i.res new_next)
+             i.operands i.res new_next)
       in
       (i, finally, env)
   | Icatch(rec_flag, ts, handlers, body) ->
@@ -348,7 +350,8 @@ let rec reload env i before =
       let env = { env with reload_at_exit; } in
       let (new_next, finally, env) = reload env i.next after_union in
       (instr_cons
-         (Icatch(rec_flag, ts, new_handlers, new_body)) i.arg i.res new_next,
+         (Icatch(rec_flag, ts, new_handlers, new_body)) i.operands i.res
+         new_next,
        finally,
        env)
   | Iexit (nfail, _traps) ->
@@ -366,17 +369,20 @@ let rec reload env i before =
          except the exception bucket *)
       let before_handler =
         Reg.Set.remove Proc.loc_exn_bucket
-                       (Reg.add_set_array handler.live handler.arg) in
+          (Reg.Set.union handler.live
+             (Mach.arg_regset handler.operands)) in
       let (new_handler, after_handler, env) =
         reload env handler before_handler
       in
       let (new_next, finally, env) =
         reload env i.next (Reg.Set.union after_body after_handler) in
-      (instr_cons (Itrywith(new_body, kind, (ts, new_handler))) i.arg i.res new_next,
+      (instr_cons (Itrywith(new_body, kind, (ts, new_handler)))
+         i.operands i.res new_next,
        finally,
        env)
   | Iraise _ ->
-      let env, i = add_reloads env (Reg.inter_set_array before i.arg) i in
+      let env, i = add_reloads env (Reg.Set.inter before
+                                      (Mach.arg_regset i.operands)) i in
       (i, Reg.Set.empty, env)
 
 (* Second pass: add spill instructions based on what we've decided to reload.
@@ -477,7 +483,8 @@ let find_in_spill_cache nfail at_join env =
 
 let add_spills env regset i =
   Reg.Set.fold
-    (fun r i -> instr_cons (Iop Ispill) [|r|] [|spill_reg_no_add env r|] i)
+    (fun r i -> instr_cons (Iop Ispill) [|Mach.Ireg r|]
+                  [|spill_reg_no_add env r|] i)
     regset i
 
 let rec spill :
@@ -492,7 +499,7 @@ let rec spill :
   | Iop Ireload ->
     spill env i.next finally (fun new_next after ->
       let before1 = Reg.diff_set_array after i.res in
-      k (instr_cons i.desc i.arg i.res new_next)
+      k (instr_cons i.desc i.operands i.res new_next)
         (Reg.add_set_array before1 i.res))
   | Iop _ ->
     spill env i.next finally (fun new_next after ->
@@ -500,12 +507,12 @@ let rec spill :
       let before =
         match i.desc with
           Iop Icall_ind | Iop(Icall_imm _) | Iop(Iextcall _) | Iop(Ialloc _)
-        | Iop(Iintop Icheckbound) | Iop(Iintop_imm(Icheckbound, _))
+        | Iop(Iintop Icheckbound)
         | Iop (Iprobe _) ->
             Reg.Set.union before1 env.at_raise
         | _ ->
             before1 in
-      k (instr_cons_debug i.desc i.arg i.res i.dbg
+      k (instr_cons_debug i.desc i.operands i.res i.dbg
                   (add_spills env (Reg.inter_set_array after i.res) new_next))
         before)
   | Iifthenelse(test, ifso, ifnot) ->
@@ -516,7 +523,7 @@ let rec spill :
         env.loop || env.arm || env.catch
       then
         k (instr_cons (Iifthenelse(test, new_ifso, new_ifnot))
-                     i.arg i.res new_next)
+                     i.operands i.res new_next)
           (Reg.Set.union before_ifso before_ifnot)
       else begin
         let destroyed = List.assq i env.destroyed_at_fork in
@@ -527,7 +534,7 @@ let rec spill :
         k (instr_cons
             (Iifthenelse(test, add_spills env spill_ifso_branch new_ifso,
                                add_spills env spill_ifnot_branch new_ifnot))
-            i.arg i.res new_next)
+            i.operands i.res new_next)
           (Reg.Set.diff (Reg.Set.diff (Reg.Set.union before_ifso before_ifnot)
                                     spill_ifso_branch)
                        spill_ifnot_branch)
@@ -543,7 +550,7 @@ let rec spill :
             before := Reg.Set.union !before before_c;
             new_c))
           cases in
-      k (instr_cons (Iswitch(index, new_cases)) i.arg i.res new_next)
+      k (instr_cons (Iswitch(index, new_cases)) i.operands i.res new_next)
         !before)
   | Icatch(rec_flag, ts, handlers, body) ->
     let next_env = { env with at_raise = at_raise_from_trap_stack env ts } in
@@ -593,7 +600,7 @@ let rec spill :
           (fun (nfail, ts, _) (handler, _) -> nfail, ts, handler)
           handlers res in
       k (instr_cons (Icatch(rec_flag, ts, new_handlers, new_body))
-         i.arg i.res new_next)
+         i.operands i.res new_next)
         before))
   | Iexit (nfail, _traps) ->
       k i (find_spill_at_exit env nfail)
@@ -616,7 +623,7 @@ let rec spill :
       in
       spill env_body body at_join (fun new_body before_body ->
       k (instr_cons (Itrywith(new_body, kind, (ts, new_handler)))
-         i.arg i.res new_next)
+         i.operands i.res new_next)
         before_body)))
   | Iraise _ ->
       k i env.at_raise

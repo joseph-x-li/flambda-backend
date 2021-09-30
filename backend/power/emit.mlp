@@ -547,7 +547,6 @@ module BR = Branch_relaxation.Make (struct
      relaxing.  As such, these functions should never be called. *)
   let relax_specific_op _ = assert false
   let relax_intop_checkbound () = assert false
-  let relax_intop_imm_checkbound ~bound:_ = assert false
 end)
 
 (* Assembly code for inlined allocation *)

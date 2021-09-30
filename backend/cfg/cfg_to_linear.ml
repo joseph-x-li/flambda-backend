@@ -30,12 +30,12 @@ module L = Linear
 
 let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     L.instruction =
-  let arg, res, dbg, live, fdo =
+  let res, operands, dbg, live, fdo =
     match like with
     | None -> [||], [||], Debuginfo.none, Reg.Set.empty, Fdo_info.none
-    | Some like -> like.arg, like.res, like.dbg, like.live, like.fdo
+    | Some like -> like.res, like.operands, like.dbg, like.live, like.fdo
   in
-  { desc; next; arg; res; dbg; live; fdo }
+  { desc; next; res; operands; dbg; live; fdo }
 
 let from_basic (basic : Cfg.basic) : L.instruction_desc =
   match basic with
@@ -48,9 +48,7 @@ let from_basic (basic : Cfg.basic) : L.instruction_desc =
   | Call (P (External { func_symbol; alloc; ty_args; ty_res })) ->
     Lop
       (Iextcall { func = func_symbol; alloc; ty_args; ty_res; returns = true })
-  | Call (P (Checkbound { immediate = None })) -> Lop (Iintop Icheckbound)
-  | Call (P (Checkbound { immediate = Some i })) ->
-    Lop (Iintop_imm (Icheckbound, i))
+  | Call (P Checkbound) -> Lop (Iintop Icheckbound)
   | Call (P (Alloc { bytes; dbginfo })) -> Lop (Ialloc { bytes; dbginfo })
   | Op op ->
     let op : Mach.operation =
@@ -63,9 +61,8 @@ let from_basic (basic : Cfg.basic) : L.instruction_desc =
       | Const_symbol n -> Iconst_symbol n
       | Stackoffset n -> Istackoffset n
       | Load (c, m) -> Iload (c, m)
-      | Store (c, m, b) -> Istore (c, m, b)
+      | Store b -> Istore b
       | Intop op -> Iintop op
-      | Intop_imm (op, i) -> Iintop_imm (op, i)
       | Floatop op -> Ifloatop op
       | Floatofint -> Ifloatofint
       | Intoffloat -> Iintoffloat
@@ -230,7 +227,7 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
         in
         branches @ branch_or_fallthrough last, None
       | _ -> assert false)
-    | Int_test { lt; eq; gt; imm; is_signed } -> (
+    | Int_test { lt; eq; gt; is_signed } -> (
       let successor_labels =
         Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
       in
@@ -248,13 +245,14 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
             Label.Set.min_elt successor_labels
         in
         let cond_successor_labels = Label.Set.remove last successor_labels in
+        let imm1 =
+          match terminator.operands.(1) with
+          | Iimm n when Targetint.equal n Targetint.one -> true
+          | Iimm _ | Iimmf _ | Ireg _ | Imem _ -> false
+        in
         (* Lcondbranch3 is emitted as an unsigned comparison, see ocaml PR
            #8677 *)
-        let can_emit_Lcondbranch3 =
-          match is_signed, imm with
-          | false, Some 1 -> true
-          | false, Some _ | false, None | true, _ -> false
-        in
+        let can_emit_Lcondbranch3 = (not is_signed) && imm1 in
         if Label.Set.cardinal cond_successor_labels = 2 && can_emit_Lcondbranch3
         then
           (* generates one cmp instruction for all conditional jumps here *)
@@ -262,7 +260,8 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
           [L.Lcondbranch3 (find lt, find eq, find gt)], None
         else
           let init = branch_or_fallthrough last in
-          ( Label.Set.fold
+          let res =
+            Label.Set.fold
               (fun lbl acc ->
                 let cond =
                   mk_int_test ~lt:(Label.equal lt lbl) ~eq:(Label.equal eq lbl)
@@ -273,14 +272,11 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
                   | true -> Mach.Isigned cond
                   | false -> Mach.Iunsigned cond
                 in
-                let test =
-                  match imm with
-                  | None -> Mach.Iinttest comp
-                  | Some n -> Mach.Iinttest_imm (comp, n)
-                in
+                let test = Mach.Iinttest comp in
                 L.Lcondbranch (test, lbl) :: acc)
-              cond_successor_labels init,
-            None )
+              cond_successor_labels init
+          in
+          res, None
       | _ -> assert false)
   in
   ( List.fold_left

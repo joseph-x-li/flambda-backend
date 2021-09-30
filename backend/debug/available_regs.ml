@@ -75,11 +75,11 @@ let check_invariants (instr : M.instruction) ~(avail_before : RAS.t) =
         (RAS.Ok avail_before)
         Printmach.regset (R.Set.diff instr.live
           (RD.Set.forget_debug_info avail_before))
-        Printmach.instr ({ instr with M. next = M.end_instr (); })
+        Printmach.instr (M.copy instr ~next:(M.end_instr ()))
     end;
     (* Every register that is an input to an instruction should be
        available. *)
-    let args = R.set_of_array instr.arg in
+    let args = Mach.arg_regset instr.operands in
     let avail_before_fdi = RD.Set.forget_debug_info avail_before in
     if not (R.Set.subset args avail_before_fdi) then begin
       Misc.fatal_errorf "Instruction has unavailable input register(s): \
@@ -87,7 +87,7 @@ let check_invariants (instr : M.instruction) ~(avail_before : RAS.t) =
         (RAS.print ~print_reg:Printmach.reg) (RAS.Ok avail_before)
         Printmach.regset avail_before_fdi
         Printmach.regset args
-        Printmach.instr ({ instr with M. next = M.end_instr (); })
+        Printmach.instr (M.copy instr ~next:(M.end_instr ()))
     end
 
 (* [available_regs ~instr ~avail_before] calculates, given the registers
@@ -115,7 +115,7 @@ let check_invariants (instr : M.instruction) ~(avail_before : RAS.t) =
 let rec available_regs (instr : M.instruction)
       ~(avail_before : RAS.t) : RAS.t =
   check_invariants instr ~avail_before;
-  instr.available_before <- avail_before;
+  Mach.update instr ~available_before:avail_before;
   let avail_across, avail_after =
     let ok set = RAS.Ok set in
     let unreachable = RAS.Unreachable in
@@ -146,11 +146,15 @@ let rec available_regs (instr : M.instruction)
               avail_before
         in
         let avail_after = ref forgetting_ident in
-        let num_parts_of_value = Array.length instr.arg in
+        (* CR gyorsh: does order matter here and if so - is it deterministic ? *)
+        let arg = Mach.arg_regset instr.operands
+                  |> Reg.Set.elements
+                  |> Array.of_list in
+        let num_parts_of_value = Array.length arg in
         (* Add debug info about [ident], but only for registers that are known
            to be available. *)
         for part_of_value = 0 to num_parts_of_value - 1 do
-          let reg = instr.arg.(part_of_value) in
+          let reg = arg.(part_of_value) in
           if RD.Set.mem_reg forgetting_ident reg then begin
             let regd =
               RD.create ~reg
@@ -172,12 +176,12 @@ let rec available_regs (instr : M.instruction)
            match up properly with [Liveness]. *)
         let move_to_same_location =
           let move_to_same_location = ref true in
-          for i = 0 to Array.length instr.arg - 1 do
-            let arg = instr.arg.(i) in
+          for i = 0 to Array.length instr.operands - 1 do
+            let arg = instr.operands.(i) in
             let res = instr.res.(i) in
             (* Note that the register classes must be the same, so we don't
                 need to check that. *)
-            if arg.loc <> res.loc then begin
+            if not (Mach.same_loc arg res) then begin
               move_to_same_location := false
             end
           done;
@@ -192,14 +196,15 @@ let rec available_regs (instr : M.instruction)
               ~register_class:Proc.register_class
         in
         let results =
-          Array.map2 (fun arg_reg result_reg ->
+          Array.map2 (fun operand result_reg ->
+              let arg_reg = Mach.arg_reg operand in
               match RD.Set.find_reg_exn avail_before arg_reg with
               | exception Not_found ->
                 assert false  (* see second invariant in [check_invariants] *)
               | arg_reg ->
                 RD.create_copying_debug_info ~reg:result_reg
                   ~debug_info_from:arg_reg)
-            instr.arg instr.res
+            instr.operands instr.res
         in
         let avail_across = RD.Set.diff avail_before made_unavailable in
         let avail_after = RD.Set.union avail_across (RD.Set.of_array results) in
@@ -211,7 +216,8 @@ let rec available_regs (instr : M.instruction)
            be clobbered by the operation writing out its results. *)
         let made_unavailable_1 =
           let regs_clobbered =
-            Array.append (Proc.destroyed_at_oper instr.desc) instr.res
+            Array.append (Proc.destroyed_at_oper instr.desc instr.operands)
+              instr.res
           in
           RD.Set.made_unavailable_by_clobber avail_before ~regs_clobbered
             ~register_class:Proc.register_class
@@ -356,7 +362,7 @@ let rec available_regs (instr : M.instruction)
         augment_availability_at_raise avail_before;
         None, unreachable
   in
-  instr.available_across <- avail_across;
+  Mach.update instr ~available_across:avail_across;
   match instr.desc with
   | Iend -> avail_after
   | _ -> available_regs instr.next ~avail_before:avail_after

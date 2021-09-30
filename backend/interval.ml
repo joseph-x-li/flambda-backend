@@ -98,12 +98,18 @@ let update_interval_position_by_set intervals regs pos kind =
   Set.iter (update_interval_position intervals pos kind) regs
 
 let update_interval_position_by_instr intervals instr pos =
-  update_interval_position_by_array intervals instr.arg pos Argument;
+  Array.iter (function
+    | Iimm _ | Iimmf _ -> ()
+    | Ireg r ->
+      update_interval_position intervals pos Argument r
+    | Imem { reg } ->
+      update_interval_position_by_array intervals reg pos Argument)
+    instr.operands;
   update_interval_position_by_array intervals instr.res pos Result;
   update_interval_position_by_set intervals instr.live pos Live
 
 let insert_destroyed_at_oper intervals instr pos =
-  let destroyed = Proc.destroyed_at_oper instr.desc in
+  let destroyed = Proc.destroyed_at_oper instr.desc instr.operands in
   if Array.length destroyed > 0 then
     update_interval_position_by_array intervals destroyed pos Result
 

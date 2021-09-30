@@ -43,7 +43,6 @@ type test =
     Itruetest
   | Ifalsetest
   | Iinttest of integer_comparison
-  | Iinttest_imm of integer_comparison * int
   | Ifloattest of float_comparison
   | Ioddtest
   | Ieventest
@@ -64,10 +63,9 @@ type operation =
                   alloc : bool; returns : bool; }
   | Istackoffset of int
   | Iload of Cmm.memory_chunk * Arch.addressing_mode
-  | Istore of Cmm.memory_chunk * Arch.addressing_mode * bool
+  | Istore of bool
   | Ialloc of { bytes : int; dbginfo : Debuginfo.alloc_dbginfo; }
   | Iintop of integer_operation
-  | Iintop_imm of integer_operation * int
   | Ifloatop of float_operation
   | Ifloatofint | Iintoffloat
   | Iopaque
@@ -77,11 +75,20 @@ type operation =
   | Iprobe of { name: string; handler_code_sym: string; }
   | Iprobe_is_enabled of { name: string }
 
+type operand =
+  | Iimm of Targetint.t
+  | Iimmf of int64
+  | Ireg of Reg.t
+  | Imem of { chunk : Cmm.memory_chunk option;
+              addr : Arch.addressing_mode;
+              reg : Reg.t array;
+            }
+
 type instruction =
   { desc: instruction_desc;
     next: instruction;
-    arg: Reg.t array;
     res: Reg.t array;
+    operands: operand array;
     dbg: Debuginfo.t;
     mutable live: Reg.Set.t;
     mutable available_before: Reg_availability_set.t;
@@ -112,8 +119,8 @@ type fundecl =
 let rec dummy_instr =
   { desc = Iend;
     next = dummy_instr;
-    arg = [||];
     res = [||];
+    operands = [||];
     dbg = Debuginfo.none;
     live = Reg.Set.empty;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
@@ -123,23 +130,53 @@ let rec dummy_instr =
 let end_instr () =
   { desc = Iend;
     next = dummy_instr;
-    arg = [||];
     res = [||];
+    operands = [||];
     dbg = Debuginfo.none;
     live = Reg.Set.empty;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
     available_across = None;
   }
 
-let instr_cons d a r n =
-  { desc = d; next = n; arg = a; res = r;
+let arg_reg operand =
+  match operand with
+  | Ireg r -> r
+  | Imem _ -> Misc.fatal_error "Mach.arg_reg: expected Ireg, found Imem"
+  | Iimm _ -> Misc.fatal_error "Mach.arg_reg: expected Ireg, found Iimm"
+  | Iimmf _ -> Misc.fatal_error "Mach.arg_reg: expected Ireg, found Iimmf"
+
+let arg_regset operands =
+  Array.fold_left (fun s -> function
+    | Iimm _ | Iimmf _ -> s
+    | Ireg r -> Reg.Set.add r s
+    | Imem { reg } -> Reg.add_set_array s reg)
+    Reg.Set.empty operands
+
+let same_loc operand reg =
+  match operand with
+  | Iimm _ | Iimmf _ -> false
+  | Imem _ ->
+    (* CR gyorsh: can be optimizeed if reg.loc is Stack and mem is
+       statically known to refer to the same stack location.
+       This case Will need to be handled if we replace the representation of
+       Reg.Stack to use Imem. *)
+    false
+  | Ireg r -> Reg.same_loc r reg
+
+let is_immediate = function
+  | Iimm _ | Iimmf _ -> true
+  | Ireg _ | Imem _ -> false
+
+let instr_cons d o r n =
+  { desc = d; next = n; res = r; operands = o;
     dbg = Debuginfo.none; live = Reg.Set.empty;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
     available_across = None;
   }
 
-let instr_cons_debug d a r dbg n =
-  { desc = d; next = n; arg = a; res = r; dbg = dbg; live = Reg.Set.empty;
+let instr_cons_debug d o r dbg n =
+  { desc = d; next = n; res = r; dbg = dbg; live = Reg.Set.empty;
+    operands = o;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
     available_across = None;
   }
@@ -171,7 +208,7 @@ let rec instr_iter f i =
             | Iconst_int _ | Iconst_float _ | Iconst_symbol _
             | Icall_ind | Icall_imm _ | Iextcall _ | Istackoffset _
             | Iload _ | Istore _ | Ialloc _
-            | Iintop _ | Iintop_imm _
+            | Iintop _
             | Ifloatop _
             | Ifloatofint | Iintoffloat
             | Ispecific _ | Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _
@@ -181,10 +218,36 @@ let rec instr_iter f i =
 let operation_can_raise op =
   match op with
   | Icall_ind | Icall_imm _ | Iextcall _
-  | Iintop (Icheckbound) | Iintop_imm (Icheckbound, _)
+  | Iintop (Icheckbound)
   | Iprobe _
   | Ialloc _ -> true
   | _ -> false
+
+let instruction
+  : desc:instruction_desc
+  -> next:instruction
+  -> res:Reg.t array
+  -> operands:operand array
+  -> dbg:Debuginfo.t
+  -> instruction
+  =
+  fun ~desc ~next ~res ~operands ~dbg ->
+      { desc; next; res; operands; dbg;
+        live = Reg.Set.empty;
+        available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
+        available_across = None;
+      }
+
+let update ?live ?available_before ?available_across i =
+  Option.iter (fun v -> i.live <- v) live;
+  Option.iter (fun v -> i.available_before <- v) available_before;
+  Option.iter (fun v -> i.available_across <- v) available_across
+
+let copy ?desc ?next ?res ?operands i =
+  let i = Option.fold ~none:i ~some:(fun v -> { i with desc=v }) desc in
+  let i = Option.fold ~none:i ~some:(fun v -> { i with next=v }) next in
+  let i = Option.fold ~none:i ~some:(fun v -> { i with res=v }) res in
+  Option.fold ~none:i ~some:(fun v -> { i with operands=v }) operands
 
 let free_conts_for_handlers fundecl =
   let module S = Numbers.Int.Set in
@@ -326,3 +389,15 @@ let equal_float_operation left right =
   | Imulf, Imulf -> true
   | Idivf, Idivf -> true
   | (Icompf _ | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf), _ -> false
+
+let equal_operand left right =
+  match left, right with
+  | Iimm left, Iimm right -> Targetint.equal left right
+  | Iimmf left, Iimmf right -> Int64.equal left right
+  | Ireg left, Ireg right -> Reg.same_loc left right
+  | Imem left, Imem right ->
+    Option.equal Cmm.equal_memory_chunk left.chunk right.chunk &&
+    Arch.equal_addressing_mode left.addr right.addr &&
+    Array.length left.reg = Array.length right.reg &&
+    Array.for_all2 Reg.same_loc left.reg right.reg
+  | (Iimm _ | Iimmf _ | Ireg _ | Imem _),_ -> false

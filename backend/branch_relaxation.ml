@@ -52,7 +52,6 @@ module Make (T : Branch_relaxation_intf.S) = struct
       match instr.desc with
       | Lop (Ialloc _)
       | Lop (Iintop (Icheckbound))
-      | Lop (Iintop_imm (Icheckbound, _))
       | Lop (Ispecific _) ->
         (* We assume that any branches eligible for relaxation generated
            by these instructions only branch forward.  We further assume
@@ -68,12 +67,12 @@ module Make (T : Branch_relaxation_intf.S) = struct
         Misc.fatal_error "Unsupported instruction for branch relaxation"
 
   let fixup_branches ~code_size ~max_out_of_line_code_offset map code =
-    let expand_optbranch lbl n arg next =
+    let expand_optbranch lbl n operands next =
       match lbl with
       | None -> next
       | Some l ->
-        instr_cons (Lcondbranch (Iinttest_imm (Isigned Cmm.Ceq, n), l))
-          arg [||] next
+        Linear.instr_cons (Lcondbranch (Iinttest (Isigned Cmm.Ceq), l))
+          [||] [| operands.(0); Iimm (Targetint.of_int n) |] next
     in
     let rec fixup did_fix pc instr =
       match instr.desc with
@@ -92,10 +91,6 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Lop (Iintop (Icheckbound)) ->
             instr.desc <- T.relax_intop_checkbound ();
             fixup true (pc + T.instr_size instr.desc) instr.next
-          | Lop (Iintop_imm (Icheckbound, bound)) ->
-            instr.desc
-              <- T.relax_intop_imm_checkbound ~bound;
-            fixup true (pc + T.instr_size instr.desc) instr.next
           | Lop (Ispecific specific) ->
             instr.desc <- T.relax_specific_op specific;
             fixup true (pc + T.instr_size instr.desc) instr.next
@@ -110,9 +105,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
             fixup true (pc + T.instr_size instr.desc) instr.next
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
             let cont =
-              expand_optbranch lbl0 0 instr.arg
-                (expand_optbranch lbl1 1 instr.arg
-                  (expand_optbranch lbl2 2 instr.arg instr.next))
+              expand_optbranch lbl0 0 instr.operands
+                (expand_optbranch lbl1 1 instr.operands
+                  (expand_optbranch lbl2 2 instr.operands instr.next))
             in
             instr.desc <- cont.desc;
             instr.next <- cont.next;

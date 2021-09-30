@@ -19,15 +19,15 @@ open Linear
 (* Cons a simple instruction (arg, res, live empty) *)
 
 let cons_instr d n =
-  { desc = d; next = n; arg = [||]; res = [||];
+  { desc = d; next = n; res = [||]; operands = [||];
     dbg = Debuginfo.none; fdo = Fdo_info.none; live = Reg.Set.empty }
 
-(* Build an instruction with arg, res, dbg, live taken from
+(* Build an instruction with operands, res, dbg, live taken from
    the given Mach.instruction *)
 
 let copy_instr d i n =
   { desc = d; next = n;
-    arg = i.Mach.arg; res = i.Mach.res;
+    res = i.Mach.res; operands = i.Mach.operands;
     dbg = i.Mach.dbg; fdo = Fdo_info.none; live = i.Mach.live }
 
 (*
@@ -166,7 +166,7 @@ let linear i n contains_calls =
     | Iop((Iextcall { returns = false; _ }) as op) ->
         copy_instr (Lop op) i (discard_dead_code n)
     | Iop(Imove | Ireload | Ispill)
-      when i.Mach.arg.(0).loc = i.Mach.res.(0).loc ->
+      when Mach.same_loc i.Mach.operands.(0) i.Mach.res.(0) ->
         linear env i.Mach.next n
     | Iop op ->
         copy_instr (Lop op) i (linear env i.Mach.next n)
@@ -283,7 +283,7 @@ let linear i n contains_calls =
         let env_body =
           { env with trap_stack = Mach.Generic_trap env.trap_stack; }
         in
-        assert (i.Mach.arg = [| |]);
+        assert (i.Mach.operands = [| |]);
         let n3 = cons_instr (Lpushtrap { lbl_handler; })
                    (linear env_body body
                       (cons_instr
@@ -322,8 +322,8 @@ let add_prologue first_insn prologue_required =
       let tailrec_entry_point =
         { desc = Llabel tailrec_entry_point_label;
           next = insn;
-          arg = [| |];
           res = [| |];
+          operands = [| |];
           dbg = insn.dbg;
           fdo = insn.fdo;
           live = insn.live;
@@ -356,8 +356,8 @@ let add_prologue first_insn prologue_required =
         let prologue =
           { desc = Lprologue;
             next = tailrec_entry_point;
-            arg = [| |];
             res = [| |];
+            operands = [| |];
             dbg = tailrec_entry_point.dbg;
             fdo = tailrec_entry_point.fdo;
             live = Reg.Set.empty;  (* will not be used *)

@@ -20,8 +20,8 @@ type label = Cmm.label
 type instruction =
   { mutable desc: instruction_desc;
     mutable next: instruction;
-    arg: Reg.t array;
     res: Reg.t array;
+    operands: Mach.operand array;
     dbg: Debuginfo.t;
     fdo: Fdo_info.t;
     live: Reg.Set.t }
@@ -70,7 +70,6 @@ let invert_test = function
     Itruetest -> Ifalsetest
   | Ifalsetest -> Itruetest
   | Iinttest(cmp) -> Iinttest(invert_integer_test cmp)
-  | Iinttest_imm(cmp, n) -> Iinttest_imm(invert_integer_test cmp, n)
   | Ifloattest(cmp) -> Ifloattest(Cmm.negate_float_comparison cmp)
   | Ieventest -> Ioddtest
   | Ioddtest -> Ieventest
@@ -80,14 +79,14 @@ let invert_test = function
 let rec end_instr =
   { desc = Lend;
     next = end_instr;
-    arg = [||];
     res = [||];
+    operands = [||];
     dbg = Debuginfo.none;
     fdo = Fdo_info.none;
     live = Reg.Set.empty }
 
 (* Cons an instruction (live, debug empty) *)
 
-let instr_cons d a r n =
-  { desc = d; next = n; arg = a; res = r;
+let instr_cons d r o n =
+  { desc = d; next = n; res = r; operands = o;
     dbg = Debuginfo.none; fdo = Fdo_info.none; live = Reg.Set.empty }

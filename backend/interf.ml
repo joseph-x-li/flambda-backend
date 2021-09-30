@@ -82,13 +82,13 @@ let build_graph fundecl =
   (* Compute interferences *)
 
   let rec interf i =
-    let destroyed = Proc.destroyed_at_oper i.desc in
+    let destroyed = Proc.destroyed_at_oper i.desc i.operands in
     if Array.length destroyed > 0 then add_interf_set destroyed i.live;
     match i.desc with
       Iend -> ()
     | Ireturn _ -> ()
     | Iop(Imove | Ispill | Ireload) ->
-        add_interf_move i.arg.(0) i.res.(0) i.live;
+        add_interf_move (Mach.arg_reg i.operands.(0)) i.res.(0) i.live;
         interf i.next
     | Iop(Itailcall_ind) -> ()
     | Iop(Itailcall_imm _) -> ()
@@ -144,23 +144,32 @@ let build_graph fundecl =
       let r = arg.(i) in r.spill_cost <- r.spill_cost + cost
     done in
 
+  let add_spill_cost_operands cost operands =
+    (* Explicitly iterate because order matters *)
+    for i = 0 to Array.length operands - 1 do
+      match operands.(i) with
+      | Iimm _ | Iimmf _ -> ()
+      | Ireg r -> r.spill_cost <- r.spill_cost + cost
+      | Imem { reg } -> add_spill_cost cost reg
+    done in
+
   (* Compute preferences and spill costs *)
 
   let rec prefer weight i =
     assert (weight > 0);
-    add_spill_cost weight i.arg;
+    add_spill_cost_operands weight i.operands;
     add_spill_cost weight i.res;
     match i.desc with
       Iend -> ()
     | Ireturn _ -> ()
     | Iop(Imove) ->
-        add_mutual_pref weight i.arg.(0) i.res.(0);
+        add_mutual_pref weight (Mach.arg_reg i.operands.(0)) i.res.(0);
         prefer weight i.next
     | Iop(Ispill) ->
-        add_pref (weight / 4) i.arg.(0) i.res.(0);
+        add_pref (weight / 4) (Mach.arg_reg i.operands.(0)) i.res.(0);
         prefer weight i.next
     | Iop(Ireload) ->
-        add_pref (weight / 4) i.res.(0) i.arg.(0);
+        add_pref (weight / 4) i.res.(0) (Mach.arg_reg i.operands.(0));
         prefer weight i.next
     | Iop(Itailcall_ind) -> ()
     | Iop(Itailcall_imm _) -> ()

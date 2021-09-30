@@ -107,8 +107,8 @@ let get_new_linear_id t =
 let create_instruction t desc ~trap_depth (i : Linear.instruction) :
     _ C.instruction =
   { desc;
-    arg = i.arg;
     res = i.res;
+    operands = i.operands;
     dbg = i.dbg;
     fdo = i.fdo;
     live = i.live;
@@ -156,8 +156,8 @@ let record_exn t (block : C.basic_block) traps =
 let create_empty_block t start ~trap_depth ~traps =
   let terminator : C.terminator C.instruction =
     { desc = C.Never (* placeholder for terminator, to be replaced *);
-      arg = [||];
       res = [||];
+      operands = [||];
       dbg = Debuginfo.none;
       fdo = Fdo_info.none;
       live = Reg.Set.empty;
@@ -341,20 +341,20 @@ let of_cmm_float_test ~lbl ~inv (cmp : Cmm.float_comparison) : C.float_test =
   | CFnle -> { eq = inv; lt = inv; gt = lbl; uo = lbl }
   | CFnge -> { eq = inv; lt = lbl; gt = inv; uo = lbl }
 
-let of_cmm_int_test ~lbl ~inv ~is_signed ~imm (cmp : Cmm.integer_comparison) :
+let of_cmm_int_test ~lbl ~inv ~is_signed (cmp : Cmm.integer_comparison) :
     C.int_test =
   match cmp with
-  | Ceq -> { eq = lbl; lt = inv; gt = inv; is_signed; imm }
-  | Clt -> { eq = inv; lt = lbl; gt = inv; is_signed; imm }
-  | Cgt -> { eq = inv; lt = inv; gt = lbl; is_signed; imm }
-  | Cne -> { eq = inv; lt = lbl; gt = lbl; is_signed; imm }
-  | Cle -> { eq = lbl; lt = lbl; gt = inv; is_signed; imm }
-  | Cge -> { eq = lbl; lt = inv; gt = lbl; is_signed; imm }
+  | Ceq -> { eq = lbl; lt = inv; gt = inv; is_signed }
+  | Clt -> { eq = inv; lt = lbl; gt = inv; is_signed }
+  | Cgt -> { eq = inv; lt = inv; gt = lbl; is_signed }
+  | Cne -> { eq = inv; lt = lbl; gt = lbl; is_signed }
+  | Cle -> { eq = lbl; lt = lbl; gt = inv; is_signed }
+  | Cge -> { eq = lbl; lt = inv; gt = lbl; is_signed }
 
-let mk_int_test ~lbl ~inv ~imm (cmp : Mach.integer_comparison) : C.int_test =
+let mk_int_test ~lbl ~inv (cmp : Mach.integer_comparison) : C.int_test =
   match cmp with
-  | Isigned cmp -> of_cmm_int_test ~lbl ~inv cmp ~is_signed:true ~imm
-  | Iunsigned cmp -> of_cmm_int_test ~lbl ~inv cmp ~is_signed:false ~imm
+  | Isigned cmp -> of_cmm_int_test ~lbl ~inv cmp ~is_signed:true
+  | Iunsigned cmp -> of_cmm_int_test ~lbl ~inv cmp ~is_signed:false
 
 let block_is_registered t (block : C.basic_block) =
   Label.Tbl.mem t.cfg.blocks block.start
@@ -382,23 +382,17 @@ let to_basic (mop : Mach.operation) : C.basic =
   | Icall_imm { func } -> Call (F (Direct { func_symbol = func }))
   | Iextcall { func; alloc; ty_args; ty_res; returns = true } ->
     Call (P (External { func_symbol = func; alloc; ty_args; ty_res }))
-  | Iintop Icheckbound -> Call (P (Checkbound { immediate = None }))
+  | Iintop Icheckbound -> Call (P Checkbound)
   | Iintop
       (( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
        | Ipopcnt | Iclz _ | Ictz _ | Ilsr | Iasr | Icomp _ ) as op) ->
     Op (Intop op)
-  | Iintop_imm (Icheckbound, i) -> Call (P (Checkbound { immediate = Some i }))
-  | Iintop_imm
-      ( (( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-         | Ipopcnt | Iclz _ | Ictz _ | Ilsl | Ilsr | Iasr | Icomp _ ) as op),
-        i ) ->
-    Op (Intop_imm (op, i))
   | Ialloc { bytes; dbginfo } -> Call (P (Alloc { bytes; dbginfo }))
   | Iprobe { name; handler_code_sym } -> Op (Probe { name; handler_code_sym })
   | Iprobe_is_enabled { name } -> Op (Probe_is_enabled { name })
   | Istackoffset i -> Op (Stackoffset i)
   | Iload (c, a) -> Op (Load (c, a))
-  | Istore (c, a, b) -> Op (Store (c, a, b))
+  | Istore b -> Op (Store b)
   | Imove -> Op Move
   | Ispill -> Op Spill
   | Ireload -> Op Reload
@@ -514,9 +508,7 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
       | Itruetest -> Truth_test { ifso = lbl; ifnot = inv }
       | Ifalsetest -> Truth_test { ifso = inv; ifnot = lbl }
       | Ifloattest cmp -> Float_test (of_cmm_float_test cmp ~lbl ~inv)
-      | Iinttest cmp -> Int_test (mk_int_test cmp ~lbl ~inv ~imm:None)
-      | Iinttest_imm (cmp, n) ->
-        Int_test (mk_int_test cmp ~lbl ~inv ~imm:(Some n))
+      | Iinttest cmp -> Int_test (mk_int_test cmp ~lbl ~inv)
     in
     add_terminator t block i desc ~trap_depth ~traps;
     create_blocks t fallthrough.insn block ~trap_depth ~traps
@@ -524,14 +516,15 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
     let fallthrough = get_or_make_label t i.next in
     let get_dest lbl = Option.value lbl ~default:fallthrough.label in
     let it : C.int_test =
-      { imm = Some 1;
-        is_signed = false;
+      { is_signed = false;
         lt = get_dest lbl0;
         eq = get_dest lbl1;
         gt = get_dest lbl2
       }
     in
-    add_terminator t block i (Int_test it) ~trap_depth ~traps;
+    assert (Array.length i.operands = 1);
+    let operands = [| i.operands.(0); Mach.Iimm Targetint.one |] in
+    add_terminator t block { i with operands } (Int_test it) ~trap_depth ~traps;
     create_blocks t fallthrough.insn block ~trap_depth ~traps
   | Lswitch labels ->
     (* CR-someday gyorsh: get rid of switches entirely and re-generate them
@@ -602,11 +595,8 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
     | Iconst_int _ | Iconst_float _ | Iconst_symbol _ | Icall_ind | Icall_imm _
     | Iextcall _ | Istackoffset _
     | Iload (_, _)
-    | Istore (_, _, _)
-    | Ialloc _ | Iintop _
-    | Iintop_imm (_, _)
-    | Iopaque | Iprobe _ | Iprobe_is_enabled _ | Ispecific _
-    | Iname_for_debugger _ ->
+    | Istore _ | Ialloc _ | Iintop _ | Iopaque | Iprobe _ | Iprobe_is_enabled _
+    | Ispecific _ | Iname_for_debugger _ ->
       let desc = to_basic mop in
       block.body <- create_instruction t desc i ~trap_depth :: block.body;
       if Mach.operation_can_raise mop then record_exn t block traps;
