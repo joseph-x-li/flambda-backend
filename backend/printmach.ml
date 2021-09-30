@@ -49,6 +49,20 @@ let regs ppf v =
   | n -> reg ppf v.(0);
          for i = 1 to n-1 do fprintf ppf " %a" reg v.(i) done
 
+let operand arg ppf = function
+  | Ireg i -> fprintf ppf "reg %a" reg arg.(i)
+  | Iimm i -> fprintf ppf "imm %i" i
+  | Imem (a, i) -> fprintf ppf "mem %a"
+                     (Arch.print_addressing reg a)
+                     (Array.sub arg i (Array.length arg - i))
+
+let operands arg ppf v =
+  match Array.length v with
+  | 0 -> ()
+  | 1 -> (operand arg) ppf v.(0)
+  | n -> (operand arg) ppf v.(0);
+         for i = 1 to n-1 do fprintf ppf " %a" (operand arg) v.(i) done
+
 let regset ppf s =
   let first = ref true in
   Reg.Set.iter
@@ -130,8 +144,9 @@ let test tst ppf arg =
   | Ieventest -> fprintf ppf "%a & 1 == 0" reg arg.(0)
   | Ioddtest -> fprintf ppf "%a & 1 == 1" reg arg.(0)
 
-let operation op arg ppf res =
+let operation op arg ppf res ops =
   if Array.length res > 0 then fprintf ppf "%a := " regs res;
+  if Array.length ops > 0 then fprintf ppf "(%a)" (operands arg) ops;
   match op with
   | Imove -> regs ppf arg
   | Ispill -> fprintf ppf "%a (spill)" regs arg
@@ -213,7 +228,7 @@ let rec instr ppf i =
   begin match i.desc with
   | Iend -> ()
   | Iop op ->
-      operation op i.arg ppf i.res
+      operation op i.arg ppf i.res i.operands
   | Ireturn traps ->
       fprintf ppf "return%a %a" Printcmm.trap_action_list traps regs i.arg
   | Iifthenelse(tst, ifso, ifnot) ->
