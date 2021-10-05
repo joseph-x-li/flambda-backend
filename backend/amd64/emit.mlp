@@ -224,8 +224,6 @@ let reg64 = function
 
 let res i n = reg i.res.(n)
 
-let arg i n = reg i.arg.(n)
-
 (* Output a reference to the lower 8, 16 or 32 bits of a register *)
 
 let reg_low_8_name  = Array.map (fun r -> Reg8L r) int_reg_name
@@ -238,10 +236,18 @@ let emit_subreg tbl typ r =
   | Stack s -> mem64 typ (slot_offset s (register_class r)) RSP
   | _ -> assert false
 
-let arg8 i n = emit_subreg reg_low_8_name BYTE i.arg.(n)
-let arg16 i n = emit_subreg reg_low_16_name WORD i.arg.(n)
-let arg32 i n = emit_subreg reg_low_32_name DWORD i.arg.(n)
-let arg64 i n = reg64 i.arg.(n)
+let arg_reg i n =
+  match Array.length i.operands with
+  | 0 -> i.arg.(n)
+  | _ ->
+     match i.operands.(n) with
+     | Ireg j -> i.arg.(j)
+     | _ -> Misc.fatal_error ("Emit.arg_reg " ^ string_of_int n)
+
+let arg8 i n = emit_subreg reg_low_8_name BYTE (arg_reg i n)
+let arg16 i n = emit_subreg reg_low_16_name WORD (arg_reg i n)
+let arg32 i n = emit_subreg reg_low_32_name DWORD (arg_reg i n)
+let arg64 i n = reg64 (arg_reg i n)
 
 let res8 i n = emit_subreg reg_low_8_name BYTE i.res.(n)
 let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
@@ -250,6 +256,7 @@ let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 (* Output an addressing mode *)
 
 let addressing addr typ i n =
+  let arg64 i n = reg64 i.arg.(n) in
   match addr with
   | Ibased(s, ofs) ->
       add_used_symbol s;
@@ -264,6 +271,20 @@ let addressing addr typ i n =
       mem64 typ ~scale d (arg64 i n)
   | Iindexed2scaled(scale, d) ->
       mem64 typ ~scale ~base:(arg64 i n) d (arg64 i (n+1))
+
+let arg i n =
+  match Array.length i.operands with
+  | 0 -> reg i.arg.(n)
+  | _ ->
+     match i.operands.(n) with
+     | Ireg j -> reg i.arg.(j)
+     | Iimm c ->
+        (* CR gyorsh: not implemented in selection yet  *)
+        assert false
+     | Imem (addr, j) ->
+        if Reg.is_stack i.arg.(j) then
+          Misc.fatal_error ("Emit.arg mem with stack " ^ string_of_int n);
+        (addressing addr REAL8 i j)
 
 (* Record live pointers at call points -- see Emitaux *)
 
