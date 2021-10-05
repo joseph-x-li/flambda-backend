@@ -80,8 +80,6 @@ type specific_operation =
   | Istore_int of nativeint * addressing_mode * bool
                                         (* Store an integer constant *)
   | Ioffset_loc of int * addressing_mode (* Add a constant to a location *)
-  | Ifloatarithmem of float_operation * addressing_mode
-                                       (* Float arith operation with memory *)
   | Ibswap of int                      (* endianness conversion *)
   | Isqrtf                             (* Float square root *)
   | Ifloatsqrtf of addressing_mode     (* Float square root from memory *)
@@ -194,15 +192,6 @@ let print_specific_operation printreg op ppf arg =
   | Ifloatsqrtf addr ->
      fprintf ppf "sqrtf float64[%a]"
              (print_addressing printreg addr) [|arg.(0)|]
-  | Ifloatarithmem(op, addr) ->
-      let op_name = function
-      | Ifloatadd -> "+f"
-      | Ifloatsub -> "-f"
-      | Ifloatmul -> "*f"
-      | Ifloatdiv -> "/f" in
-      fprintf ppf "%a %s float64[%a]" printreg arg.(0) (op_name op)
-                   (print_addressing printreg addr)
-                   (Array.sub arg 1 (Array.length arg - 1))
   | Ibswap i ->
       fprintf ppf "bswap_%i %a" i printreg arg.(0)
   | Isextend32 ->
@@ -291,8 +280,6 @@ let equal_specific_operation left right =
     Nativeint.equal x y && equal_addressing_mode x' y' && Bool.equal x'' y''
   | Ioffset_loc (x, x'), Ioffset_loc (y, y') ->
     Int.equal x y && equal_addressing_mode x' y'
-  | Ifloatarithmem (x, x'), Ifloatarithmem (y, y') ->
-    equal_float_operation x y && equal_addressing_mode x' y'
   | Ibswap left, Ibswap right ->
     Int.equal left right
   | Isqrtf, Isqrtf ->
@@ -318,7 +305,7 @@ let equal_specific_operation left right =
     Bool.equal left_is_write right_is_write
     && equal_prefetch_temporal_locality_hint left_locality right_locality
     && equal_addressing_mode left_addr right_addr
-  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
+  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ibswap _
     | Isqrtf | Ifloatsqrtf _ | Isextend32 | Izextend32 | Irdtsc | Irdpmc
     | Ifloat_iround | Ifloat_round _ | Ifloat_min | Ifloat_max
     | Icrc32q | Iprefetch _), _ ->

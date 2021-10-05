@@ -108,10 +108,6 @@ let pseudoregs_for_operation op arg res operands =
      rdx. *)
   | Iintop(Imulh _) ->
       ([| rax; arg.(1) |], [| rdx |])
-  | Ispecific(Ifloatarithmem(_,_)) ->
-      let arg' = Array.copy arg in
-      arg'.(0) <- res.(0);
-      (arg', res)
   (* For shifts with variable shift count, second arg must be in rcx *)
   | Iintop(Ilsl|Ilsr|Iasr) ->
       ([|res.(0); rcx|], res)
@@ -256,14 +252,6 @@ method! select_operation op args dbg =
          arg) -> (Ispecific(Ilea addr), [arg], [||])
       end
   (* Recognize float arithmetic with memory. *)
-  | Caddf ->
-      self#select_floatarith true Iaddf Ifloatadd args
-  | Csubf ->
-      self#select_floatarith false Isubf Ifloatsub args
-  | Cmulf ->
-      self#select_floatarith true Imulf Ifloatmul args
-  | Cdivf ->
-      self#select_floatarith false Idivf Ifloatdiv args
   | Cextcall { func = "sqrt"; alloc = false; } ->
      begin match args with
        [Cop(Cload ((Double as chunk), _), [loc], _dbg)] ->
@@ -358,24 +346,6 @@ method! select_operation op args dbg =
       Ispecific (Iprefetch { is_write; addr; locality; }), [eloc], [||]
   | _ -> super#select_operation op args dbg
 
-
-(* Recognize float arithmetic with mem *)
-
-method select_floatarith commutative regular_op mem_op args =
-  match args with
-    [arg1; Cop(Cload ((Double as chunk), _), [loc2], _)] ->
-      let (addr, arg2) = self#select_addressing chunk loc2 in
-      (Ispecific(Ifloatarithmem(mem_op, addr)),
-                 [arg1; arg2], [||])
-  | [Cop(Cload ((Double as chunk), _), [loc1], _); arg2]
-        when commutative ->
-      let (addr, arg1) = self#select_addressing chunk loc1 in
-      (Ispecific(Ifloatarithmem(mem_op, addr)),
-                 [arg2; arg1], [||])
-  | [arg1; arg2] ->
-      (Ifloatop regular_op, [arg1; arg2], [||])
-  | _ ->
-      assert false
 
 method! mark_c_tailcall =
   contains_calls := true
