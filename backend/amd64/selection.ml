@@ -192,6 +192,10 @@ method! is_immediate op n =
 
 method is_immediate_test _cmp n = is_immediate n
 
+method! memory_operands_supported = function
+  | Ifloatop (Iaddf | Isubf | Imulf |Idivf) -> true
+  | op -> super#memory_operands_supported op
+
 method! is_simple_expr e =
   match e with
   | Cop(Cextcall { func = fn; }, args, _)
