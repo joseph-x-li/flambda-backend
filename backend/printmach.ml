@@ -176,14 +176,17 @@ let operation op arg ppf res ops =
   | Ialloc { bytes = n; } ->
     fprintf ppf "alloc %i" n;
   | Iintop(op) ->
-      if is_unary_op op then begin
-        assert (Array.length arg = 1);
-        fprintf ppf "%s%a" (intop op) reg arg.(0)
-      end else begin
-        assert (Array.length arg = 2);
-        fprintf ppf "%a%s%a" reg arg.(0) (intop op) reg arg.(1)
-      end
-  | Iintop_imm(op, n) -> fprintf ppf "%a%s%i" reg arg.(0) (intop op) n
+     if Array.length ops = 0 then begin
+         if is_unary_op op then begin
+             assert (Array.length arg = 1);
+             fprintf ppf "%s%a" (intop op) reg arg.(0)
+           end else begin
+             assert (Array.length arg = 2);
+             fprintf ppf "%a%s%a" reg arg.(0) (intop op) reg arg.(1)
+           end
+       end else begin
+         fprintf ppf "%s " (intop op)
+       end
   | Ifloatop(op) ->
      if is_unary_floatop op then
        begin

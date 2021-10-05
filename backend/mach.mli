@@ -71,7 +71,6 @@ type operation =
                                  (* false = initialization, true = assignment *)
   | Ialloc of { bytes : int; dbginfo : Debuginfo.alloc_dbginfo; }
   | Iintop of integer_operation
-  | Iintop_imm of integer_operation * int
   | Ifloatop of float_operation
   | Ifloatofint | Iintoffloat
   | Iopaque

@@ -241,8 +241,6 @@ method class_of_operation op =
   | Ialloc _ -> assert false                   (* treated specially *)
   | Iintop(Icheckbound) -> Op_checkbound
   | Iintop _ -> Op_pure
-  | Iintop_imm(Icheckbound, _) -> Op_checkbound
-  | Iintop_imm(_, _) -> Op_pure
   | Ifloatop _
   | Ifloatofint | Iintoffloat -> Op_pure
   | Ispecific _ -> Op_other
