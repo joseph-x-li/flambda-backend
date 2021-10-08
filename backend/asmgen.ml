@@ -128,7 +128,7 @@ let ocamlcfg_verbose =
   | Some "1" -> true
   | Some _ | None -> false
 
-let test_cfgize (f : Mach.fundecl) (res : Linear.fundecl) : unit =
+let test_cfgize ~(fd_mach : Mach.fundecl) ~(fd_linear : Linear.fundecl) : unit =
   if ocamlcfg_verbose then begin
     Format.eprintf "processing function %s...\n%!" f.Mach.fun_name;
   end;
@@ -147,7 +147,31 @@ let test_cfgize (f : Mach.fundecl) (res : Linear.fundecl) : unit =
   if ocamlcfg_verbose then begin
     Format.eprintf "the CFG on both code paths are equivalent for function %s.\n%!"
       f.Mach.fun_name;
-  end
+  end;
+  result
+
+let test_linear_to_cfg ~fd_linear fd_cfg =
+  if !Clflags.cfg_invariants then
+    begin
+    ++ Profile.record ~accumulate:true "linear_to_cfg"
+         (Linear_to_cfg.run ~preserve_orig_labels:true)
+    ++ pass_dump_cfg_if ppf_dump dump_cfg "After linear_to_cfg"
+    ++ Profile.record ~accumulate:true "cfg_invariants" cfg_invariants
+    ++ Profile.record ~accumulate:true "cfg_equivalence2"
+         (cfg_equivalence ~expected:fd_cfg)
+    ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
+    ++ pass_dump_linear_if ppf_dump dump_linear "After cfg_to_linear"
+    ++ Profile.record ~accumulate:true "linear_equivalence"
+         (linear_equivalence ~expected:fd_linear)
+    end;
+  fd_linear
+
+let test_cfg ~fd_mach fd_linear=
+  if !Clflags.cfg_invariants then begin
+    let fd_cfg = test_cfgize ~fd_mach fd_linear in
+    test_linear_to_cfg ~fd_linear fd_cfg;
+  end;
+  fd_linear
 
 let compile_fundecl ~ppf_dump fd_cmm =
   Proc.init ();
@@ -170,24 +194,20 @@ let compile_fundecl ~ppf_dump fd_cmm =
   ++ Profile.record ~accumulate:true "liveness" liveness
   ++ Profile.record ~accumulate:true "regalloc" (regalloc ~ppf_dump 1)
   ++ Profile.record ~accumulate:true "available_regs" Available_regs.fundecl
-  ++ Profile.record ~accumulate:true "linearize" (fun (f : Mach.fundecl) ->
-      let res = Linearize.fundecl f in
-      (* CR xclerc for xclerc: temporary, for testing. *)
-      if !Clflags.use_ocamlcfg then begin
-        test_cfgize f res;
-      end;
-      res)
-  ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
-  ++ (fun (fd : Linear.fundecl) ->
+  ++ (fun (fd_mach : Mach.fundecl) ->
     if !use_ocamlcfg then begin
-      fd
-      ++ Profile.record ~accumulate:true "linear_to_cfg"
-           (Linear_to_cfg.run ~preserve_orig_labels:true)
-      ++ pass_dump_cfg_if ppf_dump dump_cfg "After linear_to_cfg"
+      fd_mach
+      ++ Profile.record ~accumulate:true "cfgize"
+         (Cfgize.fundecl ~preserve_orig_labels:false ~simplify_terminators:true)
+      ++ pass_dump_cfg_if ppf_dump dump_cfg "After cfgize"
+      ++ Profile.record ~accumulate:true "cfg_invariants" Cfg_invariants.run
       ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
-      ++ pass_dump_linear_if ppf_dump dump_linear "After cfg_to_linear"
-    end else
-      fd)
+    end else begin
+      fd_mach
+      ++ Profile.record ~accumulate:true "linearize" Linearize.fundecl
+    end;
+    ++ Profile.record ~accumulate:true "test_cfg" (test_cfg ~fd_mach))
+  ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
   ++ Profile.record ~accumulate:true "scheduling" Scheduling.fundecl
   ++ pass_dump_linear_if ppf_dump dump_scheduling "After instruction scheduling"
   ++ save_linear
