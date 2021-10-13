@@ -69,41 +69,102 @@ let stackp r =
     Stack _ -> true
   | Reg _ | Unknown -> false
 
+let mem_or_stack arg operands ~index =
+  if Array.length operands > index then
+    match operands.(index) with
+    | Iimm _ -> false
+    | Ireg j -> stackp arg.(j)
+    | Imem _ -> true
+  else begin
+      assert (Array.length arg > index);
+      stackp arg.(index)
+    end
+
+let imm operands ~index =
+  if Array.length operands > index then
+    match operands.(index) with
+    | Iimm n -> Some n
+    | Ireg _ | Imem _ -> None
+  else
+    None
+
+let is_immediate operands ~index =
+  if Array.length operands > index then
+    match operands.(index) with
+    | Iimm _ -> true
+    | Ireg _ | Imem _ -> false
+  else
+    false
+
+let same_loc_arg0_res0 arg res operands =
+  if Array.length operands > 0 then
+    match operands.(0) with
+    | Ireg j -> Reg.same_loc arg.(j) res.(0)
+    | Iimm _ | Imem _ -> false
+  else
+    Reg.same_loc arg.(0) res.(0)
+
 class reload = object (self)
 
 inherit Reloadgen.reload_generic as super
 
-method! reload_operation op arg res =
+method private one_stack arg =
+  if stackp arg.(0) && stackp arg.(1)
+  then [|arg.(0); self#makereg arg.(1)|]
+  else arg
+
+method private one_mem_or_stack arg operands =
+  match Array.length operands with
+  | 0 ->
+    self#one_stack arg
+  | n ->
+     match operands.(0), operands.(1) with
+     | Iimm _, _ | _, Iimm _ -> arg
+     | Ireg _, Ireg _ -> self#one_stack arg
+     | Imem _, Imem _ -> assert false
+     | Imem (_,r), Ireg j | Ireg j, Imem (_,r) ->
+         assert (Array.for_all (fun i -> not (stackp arg.(i))) r);
+         if stackp arg.(j) then
+           arg.(j) <- self#makereg arg.(j);
+         arg
+
+method! reload_operation op arg res operands =
+  let arg = Array.copy arg in
+  (* If operand.(i) is a memory access, force any Reg.t it refers to
+     to be in reg, not on the stack. *)
+  Array.iter (function
+      | Ireg _ | Iimm _ -> ()
+      | Imem (_, r) ->
+          Array.iter (fun j ->
+            if stackp arg.(j) then
+              arg.(j) <- self#makereg arg.(j))
+            r)
+    operands;
   match op with
+  | Iintop(Iadd) when (not (same_loc_arg0_res0 arg res operands))
+                      && is_immediate operands ~index:1 ->
+      (* This add will be turned into a lea; args and results must be
+         in registers *)
+      super#reload_operation op arg res operands
   | Iintop(Iadd|Isub|Iand|Ior|Ixor|Icheckbound) ->
-      (* One of the two arguments can reside in the stack, but not both *)
-      if stackp arg.(0) && stackp arg.(1)
-      then ([|arg.(0); self#makereg arg.(1)|], res)
-      else (arg, res)
+      (* One of the two arguments can reside in the stack or memory, but not both *)
+      (self#one_mem_or_stack arg operands, res)
   | Iintop (Icomp _) ->
       (* One of the two arguments can reside in the stack, but not both.
          The result must be in a register. *)
       let res =
         if stackp res.(0) then [| self#makereg res.(0) |] else res
       in
-      if stackp arg.(0) && stackp arg.(1)
-      then ([|arg.(0); self#makereg arg.(1)|], res)
-      else (arg, res)
-  | Iintop_imm(Iadd, _) when arg.(0).loc <> res.(0).loc ->
-      (* This add will be turned into a lea; args and results must be
-         in registers *)
-      super#reload_operation op arg res
+      (self#one_mem_or_stack arg operands, res)
   | Ispecific Ifloat_iround
-  | Ispecific (Ifloat_round _)
-  | Iintop_imm (Icomp _, _) ->
+  | Ispecific (Ifloat_round _) ->
       (* The argument(s) can be either in register or on stack.
          The result must be in a register. *)
       let res =
         if stackp res.(0) then [| self#makereg res.(0) |] else res
       in
-      arg, res
-  | Iintop(Imulh _ | Idiv | Imod | Ilsl | Ilsr | Iasr)
-  | Iintop_imm(_, _) ->
+      (arg, res)
+  | Iintop(Imulh _ | Idiv | Imod | Ilsl | Ilsr | Iasr) ->
       (* The argument(s) and results can be either in register or on stack *)
       (* Note: Imulh, Idiv, Imod: arg(0) and res(0) already forced in regs
                Ilsl, Ilsr, Iasr: arg(1) already forced in regs *)
@@ -111,7 +172,7 @@ method! reload_operation op arg res =
   | Iintop(Imul) | Ifloatop (Iaddf | Isubf | Imulf | Idivf) ->
       (* First argument (= result) must be in register, second arg
          can reside in the stack *)
-      if stackp arg.(0)
+      if mem_or_stack arg operands ~index:0
       then (let r = self#makereg arg.(0) in ([|r; arg.(1)|], [|r|]))
       else (arg, res)
   | Ispecific (Irdtsc | Irdpmc) ->
@@ -124,7 +185,7 @@ method! reload_operation op arg res =
   | Ispecific Icrc32q ->
     (* First argument and result must be in the same register.
        Second argument can be either in a register or on stack. *)
-      if stackp arg.(0)
+      if mem_or_stack arg operands ~index:0
       then (let r = self#makereg arg.(0) in ([|r; arg.(1)|], [|r|]))
       else (arg, res)
   | Ifloatofint | Iintoffloat ->
@@ -133,10 +194,10 @@ method! reload_operation op arg res =
   | Iconst_int n ->
       if n <= 0x7FFFFFFFn && n >= -0x80000000n
       then (arg, res)
-      else super#reload_operation op arg res
+      else super#reload_operation op arg res operands
   | Iconst_symbol _ ->
       if !Clflags.pic_code || !Clflags.dlcode || Arch.win64
-      then super#reload_operation op arg res
+      then super#reload_operation op arg res operands
       else (arg, res)
   | Iintop (Ipopcnt | Iclz _| Ictz _)
   | Ispecific  (Isqrtf | Isextend32 | Izextend32 | Ilea _
@@ -150,24 +211,22 @@ method! reload_operation op arg res =
   | Istore (_, _, _)|Ialloc _|Iname_for_debugger _|Iprobe _|Iprobe_is_enabled _
   | Iopaque
     -> (* Other operations: all args and results in registers *)
-      super#reload_operation op arg res
+      super#reload_operation op arg res operands
 
-method! reload_test tst arg =
+method! reload_test tst arg operands =
   match tst with
     Iinttest _ ->
       (* One of the two arguments can reside on stack *)
-      if stackp arg.(0) && stackp arg.(1)
-      then [| self#makereg arg.(0); arg.(1) |]
-      else arg
+      self#one_mem_or_stack arg operands
   | Ifloattest (CFlt | CFnlt | CFle | CFnle) ->
       (* Cf. emit.mlp: we swap arguments in this case *)
       (* First argument can be on stack, second must be in register *)
-      if stackp arg.(1)
+      if mem_or_stack arg operands ~index:1
       then [| arg.(0); self#makereg arg.(1) |]
       else arg
   | Ifloattest (CFeq | CFneq | CFgt | CFngt | CFge | CFnge) ->
       (* Second argument can be on stack, first must be in register *)
-      if stackp arg.(0)
+      if mem_or_stack arg operands ~index:0
       then [| self#makereg arg.(0); arg.(1) |]
       else arg
   | Iinttest_imm (_, _)

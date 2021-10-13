@@ -49,9 +49,7 @@ let from_basic (basic : Cfg.basic) : L.instruction_desc =
   | Call (P (External { func_symbol; alloc; ty_args; ty_res })) ->
     Lop
       (Iextcall { func = func_symbol; alloc; ty_args; ty_res; returns = true })
-  | Call (P (Checkbound { immediate = None })) -> Lop (Iintop Icheckbound)
-  | Call (P (Checkbound { immediate = Some i })) ->
-    Lop (Iintop_imm (Icheckbound, i))
+  | Call (P Checkbound) -> Lop (Iintop Icheckbound)
   | Call (P (Alloc { bytes; dbginfo })) -> Lop (Ialloc { bytes; dbginfo })
   | Op op ->
     let op : Mach.operation =
@@ -66,7 +64,6 @@ let from_basic (basic : Cfg.basic) : L.instruction_desc =
       | Load (c, m) -> Iload (c, m)
       | Store (c, m, b) -> Istore (c, m, b)
       | Intop op -> Iintop op
-      | Intop_imm (op, i) -> Iintop_imm (op, i)
       | Floatop op -> Ifloatop op
       | Floatofint -> Ifloatofint
       | Intoffloat -> Iintoffloat

@@ -156,18 +156,11 @@ let basic_or_terminator_of_operation :
   | Iload (mem, mode) -> Basic (Op (Load (mem, mode)))
   | Istore (mem, mode, assignment) -> Basic (Op (Store (mem, mode, assignment)))
   | Ialloc { bytes; dbginfo } -> Basic (Call (P (Alloc { bytes; dbginfo })))
-  | Iintop Icheckbound -> Basic (Call (P (Checkbound { immediate = None })))
-  | Iintop_imm (Icheckbound, i) ->
-    Basic (Call (P (Checkbound { immediate = Some i })))
+  | Iintop Icheckbound -> Basic (Call (P Checkbound))
   | Iintop
       (( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
        | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) as op) ->
     Basic (Op (Intop op))
-  | Iintop_imm
-      ( (( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-         | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) as op),
-        imm ) ->
-    Basic (Op (Intop_imm (op, imm)))
   | Ifloatop op -> Basic (Op (Floatop op))
   | Ifloatofint -> Basic (Op Floatofint)
   | Iintoffloat -> Basic (Op Intoffloat)
@@ -315,7 +308,6 @@ let can_raise_operation : Cfg.operation -> bool =
   | Load _ -> false
   | Store _ -> false
   | Intop _ -> false
-  | Intop_imm _ -> false
   | Floatop _ -> false
   | Floatofint -> false
   | Intoffloat -> false
@@ -345,7 +337,7 @@ let is_noop_move (instr : Cfg.basic Cfg.instruction) : bool =
     Reg.same_loc instr.Cfg.arg.(0) instr.Cfg.res.(0)
   | Op
       ( Const_int _ | Const_float _ | Const_symbol _ | Stackoffset _ | Load _
-      | Store _ | Intop _ | Intop_imm _ | Floatop _ | Floatofint | Intoffloat
+      | Store _ | Intop _ | Floatop _ | Floatofint | Intoffloat
       | Probe _ | Opaque | Probe_is_enabled _ | Specific _ | Name_for_debugger _
         )
   | Call _ | Reloadretaddr | Pushtrap _ | Poptrap | Prologue ->

@@ -79,7 +79,7 @@ type operation =
 type operand =
   | Iimm of int
   | Ireg of int
-  | Imem of Arch.addressing_mode * int
+  | Imem of Arch.addressing_mode * int array
 
 type instruction =
   { desc: instruction_desc;
@@ -179,7 +179,7 @@ let rec instr_iter f i =
             | Iconst_int _ | Iconst_float _ | Iconst_symbol _
             | Icall_ind | Icall_imm _ | Iextcall _ | Istackoffset _
             | Iload _ | Istore _ | Ialloc _
-            | Iintop _ 
+            | Iintop _
             | Ifloatop _
             | Ifloatofint | Iintoffloat
             | Ispecific _ | Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _
@@ -189,13 +189,14 @@ let rec instr_iter f i =
 let operation_can_raise op =
   match op with
   | Icall_ind | Icall_imm _ | Iextcall _
-  | Iintop (Icheckbound) | Iintop_imm (Icheckbound, _)
+  | Iintop (Icheckbound)
   | Iprobe _
   | Ialloc _ -> true
   | _ -> false
 
-let mem_operand mode index =
-  Imem (mode, index)
+let mem_operand mode ~index ~len =
+  let r = Array.init len (fun i -> index + i) in
+  Imem (mode, r)
 
 let free_conts_for_handlers fundecl =
   let module S = Numbers.Int.Set in
@@ -337,3 +338,14 @@ let equal_float_operation left right =
   | Imulf, Imulf -> true
   | Idivf, Idivf -> true
   | (Icompf _ | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf), _ -> false
+
+let equal_operand left right =
+  match left, right with
+  | Iimm left, Iimm right -> Int.equal left right
+  | Ireg left, Ireg right -> Int.equal left right
+  | Imem (addr_left, left), Imem (addr_right, right) ->
+    Arch.equal_addressing_mode addr_left addr_right &&
+    Array.length left = Array.length right &&
+    Array.for_all2 Int.equal left right
+  | (Iimm _ | Ireg _ | Imem _),_ -> false
+

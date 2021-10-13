@@ -216,7 +216,6 @@ let dump_op ppf = function
   | Load _ -> Format.fprintf ppf "load"
   | Store _ -> Format.fprintf ppf "store"
   | Intop op -> Format.fprintf ppf "intop %s" (intop op)
-  | Intop_imm (op, n) -> Format.fprintf ppf "intop %s %d" (intop op) n
   | Floatop op -> Format.fprintf ppf "floatop %s" (floatop op)
   | Floatofint -> Format.fprintf ppf "floattoint"
   | Intoffloat -> Format.fprintf ppf "intoffloat"
@@ -233,7 +232,7 @@ let dump_call ppf = function
     | External { func_symbol : string; _ } ->
       Format.fprintf ppf "external %s" func_symbol
     | Alloc { bytes : int; _ } -> Format.fprintf ppf "alloc %d" bytes
-    | Checkbound _ -> Format.fprintf ppf "checkbound")
+    | Checkbound -> Format.fprintf ppf "checkbound")
   | F func_call -> (
     match func_call with
     | Indirect -> Format.fprintf ppf "indirect"

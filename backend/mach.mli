@@ -89,8 +89,8 @@ type operation =
 type operand =
   | Iimm of int
   | Ireg of int                                 (** Index into instruction.arg *)
-  | Imem of Arch.addressing_mode * int
-       (** index into instruction.arg for the register used in addressing_mode *)
+  | Imem of Arch.addressing_mode * int array
+    (** indexes into instruction.arg for the registers used in addressing_mode *)
 
 type instruction =
   { desc: instruction_desc;
@@ -137,7 +137,7 @@ val instr_cons_debug:
 val instr_iter: (instruction -> unit) -> instruction -> unit
 
 val operation_can_raise : operation -> bool
-val mem_operand : Arch.addressing_mode -> int -> operand
+val mem_operand : Arch.addressing_mode -> index:int -> len:int -> operand
 
 val free_conts_for_handlers : fundecl -> Numbers.Int.Set.t Numbers.Int.Map.t
 val equal_trap_stack : trap_stack -> trap_stack -> bool
@@ -145,3 +145,4 @@ val equal_trap_stack : trap_stack -> trap_stack -> bool
 val equal_integer_comparison : integer_comparison -> integer_comparison -> bool
 val equal_integer_operation : integer_operation -> integer_operation -> bool
 val equal_float_operation : float_operation -> float_operation -> bool
+val equal_operand : operand -> operand -> bool

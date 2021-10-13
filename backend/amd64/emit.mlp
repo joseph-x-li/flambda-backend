@@ -244,15 +244,6 @@ let arg_reg i n =
      | Ireg j -> i.arg.(j)
      | _ -> Misc.fatal_error ("Emit.arg_reg " ^ string_of_int n)
 
-let arg8 i n = emit_subreg reg_low_8_name BYTE (arg_reg i n)
-let arg16 i n = emit_subreg reg_low_16_name WORD (arg_reg i n)
-let arg32 i n = emit_subreg reg_low_32_name DWORD (arg_reg i n)
-let arg64 i n = reg64 (arg_reg i n)
-
-let res8 i n = emit_subreg reg_low_8_name BYTE i.res.(n)
-let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
-let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
-
 (* Output an addressing mode *)
 
 let addressing addr typ i n =
@@ -272,19 +263,40 @@ let addressing addr typ i n =
   | Iindexed2scaled(scale, d) ->
       mem64 typ ~scale ~base:(arg64 i n) d (arg64 i (n+1))
 
+let arg8 i n = emit_subreg reg_low_8_name BYTE (arg_reg i n)
+let arg16 i n = emit_subreg reg_low_16_name WORD (arg_reg i n)
+let arg32 i n = emit_subreg reg_low_32_name DWORD (arg_reg i n)
+let arg64 i n = reg64 (arg_reg i n)
+
+let res8 i n = emit_subreg reg_low_8_name BYTE i.res.(n)
+let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
+let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
+
 let arg i n =
   match Array.length i.operands with
   | 0 -> reg i.arg.(n)
   | _ ->
      match i.operands.(n) with
      | Ireg j -> reg i.arg.(j)
-     | Iimm c ->
-        (* CR gyorsh: not implemented in selection yet  *)
-        assert false
-     | Imem (addr, j) ->
-        if Reg.is_stack i.arg.(j) then
-          Misc.fatal_error ("Emit.arg mem with stack " ^ string_of_int n);
-        (addressing addr REAL8 i j)
+     | Iimm c -> int c
+     | Imem (addr, r) ->
+        if Array.length r = 0 then
+          Misc.fatal_error "Emit.arg mem without base reg";
+        Array.iter (fun j ->
+         if Reg.is_stack i.arg.(j)  then
+           Misc.fatal_error ("Emit.arg mem with stack " ^ string_of_int n))
+          r;
+        (addressing addr REAL8 i r.(0))
+
+let operand i ~index =
+  match Array.length i.operands with
+  | 0 -> Ireg index
+  | n -> i.operands.(index)
+
+let same_loc_arg_res0 i ~index =
+  match operand i ~index with
+  | Ireg j -> same_loc i.arg.(j) i.res.(0)
+  | Iimm _ | Imem _ -> false
 
 (* Record live pointers at call points -- see Emitaux *)
 
@@ -402,10 +414,13 @@ let rounding_mode = function
 
 (* Output an = 0 or <> 0 test. *)
 
-let output_test_zero arg =
-  match arg.loc with
-  | Reg.Reg _ -> I.test (reg arg) (reg arg)
-  | _  -> I.cmp (int 0) (reg arg)
+let output_test_zero i =
+  match operand i ~index:0 with
+  | Ireg j when Reg.is_reg i.arg.(j) ->
+     I.test (arg i 0) (arg i 0)
+  | Ireg _ | Imem _ ->
+     I.cmp (int 0) (arg i 0)
+  | Iimm _ -> assert false
 
 (* Output a floating-point compare and branch *)
 
@@ -663,7 +678,7 @@ let emit_instr fallthrough i =
       end;
     end
   | Lop(Imove | Ispill | Ireload) ->
-      move i.arg.(0) i.res.(0)
+      move (arg_reg i 0) i.res.(0)
   | Lop(Iconst_int n) ->
       if n = 0n then begin
         match i.res.(0).loc with
@@ -809,44 +824,54 @@ let emit_instr fallthrough i =
       I.cmp (arg i 1) (arg i 0);
       I.set (cond cmp) al;
       I.movzx al (res i 0)
-  | Lop(Iintop_imm(Icomp cmp, n)) ->
-      I.cmp (int n) (arg i 0);
-      I.set (cond cmp) al;
-      I.movzx al (res i 0)
   | Lop(Iintop (Icheckbound)) ->
       let lbl = bound_error_label i.dbg in
       I.cmp (arg i 1) (arg i 0);
       I.jbe (label lbl)
-  | Lop(Iintop_imm(Icheckbound, n)) ->
-      let lbl = bound_error_label i.dbg in
-      I.cmp (int n) (arg i 0);
-      I.jbe (label lbl)
-  | Lop(Iintop_imm (Iand, n)) when n >= 0 && n <= 0xFFFF_FFFF && Reg.is_reg i.res.(0) ->
-      I.and_ (int n) (res32 i 0)
-  | Lop(Iintop Ixor) when i.arg.(1).loc = i.res.(0).loc && Reg.is_reg i.res.(0) ->
-      I.xor (res32 i 0) (res32 i 0)
+  | Lop(Iintop Ixor) when same_loc_arg_res0 i ~index:1 && Reg.is_reg i.res.(0) ->
+     I.xor (res32 i 0) (res32 i 0)
   | Lop(Iintop(Idiv | Imod)) ->
       I.cqo ();
       I.idiv (arg i 1)
   | Lop(Iintop(Ilsl | Ilsr | Iasr as op)) ->
       (* We have i.arg.(0) = i.res.(0) and i.arg.(1) = %rcx *)
+      assert (same_loc_arg_res0 i ~index:0);
       instr_for_intop op cl (res i 0)
   | Lop(Iintop (Imulh { signed = true })) ->
       I.imul (arg i 1) None
   | Lop(Iintop (Imulh { signed = false })) ->
       I.mul (arg i 1)
-  | Lop(Iintop ((Iadd|Isub|Imul|Iand|Ior|Ixor) as op)) ->
+  | Lop(Iintop Iadd) ->
+      (match operand i ~index:1 with
+       | Iimm n when not (same_loc_arg_res0 i ~index:0) ->
+          I.lea (mem64 NONE n (arg64 i 0)) (res i 0)
+       | Iimm 1 when not !fastcode_flag ->
+          I.inc (res i 0)
+       | Iimm (-1) when not !fastcode_flag ->
+          I.dec (res i 0)
+       | Iimm _ | Ireg _ | Imem _ ->
+          instr_for_intop Iadd (arg i 1) (res i 0))
+  | Lop(Iintop Isub) ->
+      (match operand i ~index:1 with
+       | Iimm 1 when not !fastcode_flag ->
+          I.dec (res i 0)
+       | Iimm (-1) when not !fastcode_flag ->
+          I.inc (res i 0)
+       | Iimm _ | Ireg _ | Imem _ ->
+          instr_for_intop Isub (arg i 1) (res i 0))
+  | Lop(Iintop Iand) ->
+      let res =
+        match operand i ~index:1 with
+        | Iimm n when n >= 0 && n <= 0xFFFF_FFFF && Reg.is_reg i.res.(0) ->
+           (res32 i 0)
+        | Iimm _ | Ireg _ | Imem _ ->
+           (res i 0)
+      in
+      instr_for_intop Iand (arg i 1) res
+  | Lop(Iintop ((Imul|Ior|Ixor) as op)) ->
       (* We have i.arg.(0) = i.res.(0) *)
+      assert (same_loc_arg_res0 i ~index:0);
       instr_for_intop op (arg i 1) (res i 0)
-  | Lop(Iintop_imm(Iadd, n)) when i.arg.(0).loc <> i.res.(0).loc ->
-      I.lea (mem64 NONE n (arg64 i 0)) (res i 0)
-  | Lop(Iintop_imm(Iadd, 1) | Iintop_imm(Isub, -1)) when not !fastcode_flag ->
-      I.inc (res i 0)
-  | Lop(Iintop_imm(Iadd, -1) | Iintop_imm(Isub, 1)) when not !fastcode_flag ->
-      I.dec (res i 0)
-  | Lop(Iintop_imm(op, n)) ->
-      (* We have i.arg.(0) = i.res.(0) *)
-      instr_for_intop op (int n) (res i 0)
   | Lop(Ifloatop(Icompf cmp)) ->
       let cond, need_swap = float_cond_and_need_swap cmp in
       let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
@@ -864,7 +889,7 @@ let emit_instr fallthrough i =
   | Lop(Iintoffloat) ->
       I.cvttsd2si (arg i 0) (res i 0)
   | Lop(Iopaque) ->
-      assert (i.arg.(0).loc = i.res.(0).loc)
+      assert (same_loc_arg_res0 i ~index:0)
   | Lop(Ispecific(Ilea addr)) ->
       I.lea (addressing addr NONE i 0) (res i 0)
   | Lop(Ispecific(Istore_int(n, addr, _))) ->
@@ -1022,17 +1047,17 @@ let emit_instr fallthrough i =
       let lbl = label lbl in
       begin match tst with
       | Itruetest ->
-          output_test_zero i.arg.(0);
+          output_test_zero i;
           I.jne lbl
       | Ifalsetest ->
-          output_test_zero i.arg.(0);
+          output_test_zero i;
           I.je lbl
       | Iinttest cmp ->
           I.cmp (arg i 1) (arg i 0);
           I.j (cond cmp) lbl
       | Iinttest_imm((Isigned Ceq | Isigned Cne |
                       Iunsigned Ceq | Iunsigned Cne) as cmp, 0) ->
-          output_test_zero i.arg.(0);
+          output_test_zero i;
           I.j (cond cmp) lbl
       | Iinttest_imm(cmp, n) ->
           I.cmp (int n) (arg i 0);
@@ -1068,7 +1093,7 @@ let emit_instr fallthrough i =
          can still be assigned to one of these two registers, so
          we must be careful not to clobber it before use. *)
       let (tmp1, tmp2) =
-        if i.arg.(0).loc = Reg 0 (* rax *)
+        if Reg.same_loc (arg_reg i 0) (phys_reg 0) (* rax *)
         then (phys_reg 4 (*rdx*), phys_reg 0 (*rax*))
         else (phys_reg 0 (*rax*), phys_reg 4 (*rdx*)) in
 

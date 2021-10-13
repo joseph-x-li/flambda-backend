@@ -219,10 +219,6 @@ let check_operation : location -> Cfg.operation -> Cfg.operation -> unit =
   | Intop left_op, Intop right_op
     when Mach.equal_integer_operation left_op right_op ->
     ()
-  | Intop_imm (left_op, left_imm), Intop_imm (right_op, right_imm)
-    when Mach.equal_integer_operation left_op right_op
-         && Int.equal left_imm right_imm ->
-    ()
   | Floatop left_op, Floatop right_op
     when Mach.equal_float_operation left_op right_op ->
     ()
@@ -273,10 +269,7 @@ let check_prim_call_operation :
     when Int.equal expected_bytes result_bytes ->
     (* CR xclerc for xclerc: also check debug info *)
     ()
-  | ( Checkbound { immediate = expected_immediate },
-      Checkbound { immediate = result_immediate } )
-    when Option.equal Int.equal expected_immediate result_immediate ->
-    ()
+  | Checkbound, Checkbound -> ()
   | _ -> different location "primitive call operation"
  [@@ocaml.warning "-4"]
 
@@ -346,6 +339,9 @@ let check_instruction :
   let location = Printf.sprintf "%s (index %d)" location idx in
   (* CR xclerc for xclerc: double check whether `Reg.same_loc` is enough. (note:
      `Reg.Set.equal` uses the `stamp` fields) *)
+  if check_arg && not (array_equal Mach.equal_operand
+                         expected.operands result.operands)
+  then different location "input operands";
   if check_arg && not (array_equal Reg.same_loc expected.arg result.arg)
   then different location "input registers";
   if not (array_equal Reg.same_loc expected.res result.res)

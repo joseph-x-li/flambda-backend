@@ -305,11 +305,11 @@ let destroyed_at_oper = function
     Iop(Icall_ind | Icall_imm _ | Iextcall { alloc = true; }) ->
     all_phys_regs
   | Iop(Iextcall { alloc = false; }) -> destroyed_at_c_call
-  | Iop(Iintop(Idiv | Imod)) | Iop(Iintop_imm((Idiv | Imod), _))
+  | Iop(Iintop(Idiv | Imod))
         -> [| rax; rdx |]
   | Iop(Istore(Single, _, _)) -> [| rxmm15 |]
   | Iop(Ialloc _) -> destroyed_at_alloc
-  | Iop(Iintop(Imulh _ | Icomp _) | Iintop_imm((Icomp _), _))
+  | Iop(Iintop(Imulh _ | Icomp _))
         -> [| rax |]
   | Iswitch(_, _) -> [| rax; rdx |]
   | Itrywith _ -> [| r11 |]
@@ -322,9 +322,6 @@ let destroyed_at_oper = function
                  | Ibswap _ | Ifloatsqrtf _))
   | Iop(Iintop(Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
               | Ipopcnt | Iclz _ | Ictz _ | Icheckbound))
-  | Iop(Iintop_imm((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
-                   | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _
-                   | Icheckbound),_))
   | Iop(Istore((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
                | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
                | Double ), _, _))
@@ -358,7 +355,7 @@ let safe_register_pressure = function
   | Iconst_int _ | Iconst_float _ | Iconst_symbol _
   | Icall_ind | Icall_imm _ | Itailcall_ind | Itailcall_imm _
   | Istackoffset _ | Iload (_, _) | Istore (_, _, _)
-  | Iintop _ | Iintop_imm (_, _) | Ispecific _ | Iname_for_debugger _
+  | Iintop _ | Ispecific _ | Iname_for_debugger _
   | Iprobe _ | Iprobe_is_enabled _ | Iopaque
     -> if fp then 10 else 11
 
@@ -372,18 +369,16 @@ let max_register_pressure =
     if win64
       then consumes ~int:5 ~float:6
       else consumes ~int:9 ~float:16
-  | Iintop(Idiv | Imod) | Iintop_imm((Idiv | Imod), _) ->
+  | Iintop(Idiv | Imod) ->
     consumes ~int:2 ~float:0
   | Ialloc _ ->
     consumes ~int:(1 + num_destroyed_by_plt_stub) ~float:0
-  | Iintop(Icomp _) | Iintop_imm((Icomp _), _) ->
+  | Iintop(Icomp _) ->
     consumes ~int:1 ~float:0
   | Istore(Single, _, _) | Ifloatop(Icompf _) ->
     consumes ~int:0 ~float:1
   | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
            | Ipopcnt|Iclz _| Ictz _|Icheckbound)
-  | Iintop_imm((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr
-                | Iasr | Ipopcnt | Iclz _| Ictz _|Icheckbound), _)
   | Istore((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
             | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
             | Double ),
@@ -408,7 +403,7 @@ let max_register_pressure =
 let op_is_pure = function
   | Icall_ind | Icall_imm _ | Itailcall_ind | Itailcall_imm _
   | Iextcall _ | Istackoffset _ | Istore _ | Ialloc _
-  | Iintop(Icheckbound) | Iintop_imm(Icheckbound, _) | Iopaque -> false
+  | Iintop(Icheckbound) | Iopaque -> false
   | Ispecific(Iprefetch _) -> false
   | Ispecific(Ilea _ | Isextend32 | Izextend32 | Ifloat_iround | Ifloat_round _
              | Ifloat_min | Ifloat_max) -> true
@@ -418,8 +413,6 @@ let op_is_pure = function
   | Iprobe _ | Iprobe_is_enabled _-> false
   | Iintop(Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
           | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _|Ictz _|Icomp _)
-  | Iintop_imm((Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-               | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _|Ictz _|Icomp _), _)
   | Imove | Ispill | Ireload | Ifloatop _
   | Ifloatofint | Iintoffloat | Iconst_int _ | Iconst_float _ | Iconst_symbol _
   | Iload (_, _) | Iname_for_debugger _

@@ -118,7 +118,7 @@ let rec live env i finally =
               env.at_raise
           | Icall_ind | Icall_imm _ | Iextcall _ | Ialloc _
           | Iprobe _
-          | Iintop (Icheckbound) | Iintop_imm(Icheckbound, _) ->
+          | Iintop (Icheckbound) ->
               (* The function call may raise an exception, branching to the
                  nearest enclosing try ... with. Similarly for bounds checks,
                  probes and allocation (for the latter: finalizers may throw

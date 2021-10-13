@@ -52,9 +52,10 @@ let regs ppf v =
 let operand arg ppf = function
   | Ireg i -> fprintf ppf "reg %a" reg arg.(i)
   | Iimm i -> fprintf ppf "imm %i" i
-  | Imem (a, i) -> fprintf ppf "mem %a"
-                     (Arch.print_addressing reg a)
-                     (Array.sub arg i (Array.length arg - i))
+  | Imem (a, [|i;_|]) -> fprintf ppf "mem %a"
+                           (Arch.print_addressing reg a)
+                           (Array.sub arg i (Array.length arg - i))
+  | Imem _ -> Misc.fatal_error "Printmach.operand: unexpected Imem"
 
 let operands arg ppf v =
   match Array.length v with

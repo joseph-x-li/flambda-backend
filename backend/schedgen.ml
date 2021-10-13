@@ -187,7 +187,6 @@ method is_load = function
 
 method is_checkbound = function
     Iintop(Icheckbound) -> true
-  | Iintop_imm(Icheckbound, _) -> true
   | _ -> false
 
 method private instr_is_store instr =

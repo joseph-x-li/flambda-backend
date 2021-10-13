@@ -495,7 +495,8 @@ method virtual is_immediate_test : integer_comparison -> int -> bool
 (* Selection of addressing modes *)
 
 method virtual select_addressing :
-  Cmm.memory_chunk -> Cmm.expression -> Arch.addressing_mode * Cmm.expression
+  Cmm.memory_chunk -> Cmm.expression ->
+  Arch.addressing_mode * Cmm.expression * int
 
 (* Default instruction selection for stores (of words) *)
 
@@ -519,7 +520,7 @@ method mark_instr = function
       self#mark_tailcall
   | Iop (Ialloc _) ->
       self#mark_call (* caml_alloc*, caml_garbage_collection *)
-  | Iop (Iintop(Icheckbound) | Iintop_imm(Icheckbound, _)) ->
+  | Iop (Iintop Icheckbound) ->
       self#mark_c_tailcall (* caml_ml_array_bound_error *)
   | Iraise raise_kind ->
     begin match raise_kind with
@@ -546,10 +547,10 @@ method select_operation op args _dbg =
   | (Cextcall { func; alloc; ty; ty_args; returns }, _) ->
     Iextcall { func; alloc; ty_res = ty; ty_args; returns }, args, [||]
   | (Cload (chunk, _mut), [arg]) ->
-      let (addr, eloc) = self#select_addressing chunk arg in
+      let (addr, eloc, _) = self#select_addressing chunk arg in
       (Iload(chunk, addr), [eloc], [||])
   | (Cstore (chunk, init), [arg1; arg2]) ->
-      let (addr, eloc) = self#select_addressing chunk arg1 in
+      let (addr, eloc, _) = self#select_addressing chunk arg1 in
       let is_assign =
         match init with
         | Lambda.Root_initialization -> false
@@ -601,24 +602,24 @@ method select_operation op args _dbg =
 
 method private select_arith_comm op = function
   | [arg; Cconst_int (n, _)] when self#is_immediate op n ->
-      (Iintop_imm(op, n), [arg], [||])
+      (Iintop op, [arg], [|Ireg 0; Iimm n|])
   | [Cconst_int (n, _); arg] when self#is_immediate op n ->
-      (Iintop_imm(op, n), [arg], [||])
+      (Iintop op, [arg], [|Ireg 0; Iimm n|])
   | args ->
       (Iintop op, args, [||])
 
 method private select_arith op = function
   | [arg; Cconst_int (n, _)] when self#is_immediate op n ->
-      (Iintop_imm(op, n), [arg], [||])
+      (Iintop op, [arg], [|Ireg 0; Iimm n|])
   | args ->
       (Iintop op, args, [||])
 
 method private select_arith_comp cmp = function
   | [arg; Cconst_int (n, _)] when self#is_immediate (Icomp cmp) n ->
-      (Iintop_imm(Icomp cmp, n), [arg], [||])
+      (Iintop(Icomp cmp), [arg], [|Ireg 0; Iimm n|])
   | [Cconst_int (n, _); arg]
     when self#is_immediate (Icomp(swap_intcomp cmp)) n ->
-      (Iintop_imm(Icomp(swap_intcomp cmp), n), [arg], [||])
+      (Iintop(Icomp(swap_intcomp cmp)), [arg], [|Ireg 0; Iimm n|])
   | args ->
       (Iintop(Icomp cmp), args, [||])
 
@@ -631,18 +632,18 @@ method private select_operands op args ~commutative ~chunk =
   | [arg1; Cop(Cload (c, _), [loc2], _)]
        when self#memory_operands_supported op
             && equal_memory_chunk chunk c ->
-     let (addr, arg2) = self#select_addressing chunk loc2 in
+     let (addr, arg2, n) = self#select_addressing chunk loc2 in
      op,
      [arg1; arg2],
-     [| Ireg 0; mem_operand addr 1 |]
+     [| Ireg 0; mem_operand addr ~index:1 ~len:n |]
   | [Cop(Cload (c, _), [loc1], _); arg2]
        when commutative
             && self#memory_operands_supported op
             && equal_memory_chunk chunk c ->
-      let (addr, arg1) = self#select_addressing chunk loc1 in
+      let (addr, arg1, n) = self#select_addressing chunk loc1 in
       op,
       [arg2; arg1],
-      [| Ireg 0; mem_operand addr 1; |]
+      [| Ireg 0; mem_operand addr ~index:1 ~len:n |]
   | _ -> op, args, [||]
 
 method private select_floatarith op args ~commutative =

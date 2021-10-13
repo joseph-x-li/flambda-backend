@@ -384,17 +384,11 @@ let to_basic (mop : Mach.operation) : C.basic =
   | Icall_imm { func } -> Call (F (Direct { func_symbol = func }))
   | Iextcall { func; alloc; ty_args; ty_res; returns = true } ->
     Call (P (External { func_symbol = func; alloc; ty_args; ty_res }))
-  | Iintop Icheckbound -> Call (P (Checkbound { immediate = None }))
+  | Iintop Icheckbound -> Call (P Checkbound)
   | Iintop
       (( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
        | Ipopcnt | Iclz _ | Ictz _ | Ilsr | Iasr | Icomp _ ) as op) ->
     Op (Intop op)
-  | Iintop_imm (Icheckbound, i) -> Call (P (Checkbound { immediate = Some i }))
-  | Iintop_imm
-      ( (( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-         | Ipopcnt | Iclz _ | Ictz _ | Ilsl | Ilsr | Iasr | Icomp _ ) as op),
-        i ) ->
-    Op (Intop_imm (op, i))
   | Ialloc { bytes; dbginfo } -> Call (P (Alloc { bytes; dbginfo }))
   | Iprobe { name; handler_code_sym } -> Op (Probe { name; handler_code_sym })
   | Iprobe_is_enabled { name } -> Op (Probe_is_enabled { name })
@@ -606,7 +600,6 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
     | Iload (_, _)
     | Istore (_, _, _)
     | Ialloc _ | Iintop _
-    | Iintop_imm (_, _)
     | Iopaque | Iprobe _ | Iprobe_is_enabled _ | Ispecific _
     | Iname_for_debugger _ ->
       let desc = to_basic mop in

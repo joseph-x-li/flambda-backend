@@ -72,7 +72,8 @@ class virtual selector_generic : object
     (* Must be defined to indicate whether a constant is a suitable
        immediate operand to the given integer test *)
   method virtual select_addressing :
-    Cmm.memory_chunk -> Cmm.expression -> Arch.addressing_mode * Cmm.expression
+    Cmm.memory_chunk -> Cmm.expression ->
+    Arch.addressing_mode * Cmm.expression * int
     (* Must be defined to select addressing modes *)
   method is_simple_expr: Cmm.expression -> bool
   method effects_of : Cmm.expression -> Effect_and_coeffect.t

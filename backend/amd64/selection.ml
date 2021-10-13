@@ -88,17 +88,31 @@ let rax = phys_reg 0
 let rcx = phys_reg 5
 let rdx = phys_reg 4
 
+(* arg.(0) is the same as res.(0) *)
+let same_reg_res0_arg0 arg res =
+  let arg' = Array.copy arg in
+  arg'.(0) <- res.(0);
+  (arg', res)
+
+let is_immediate operands ~index =
+  if Array.length operands > index then
+    match operands.(index) with
+    | Iimm _ -> true
+    | Ireg _ | Imem _ -> false
+  else
+    false
+
 let pseudoregs_for_operation op arg res operands =
   match op with
-  (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
+  (* arg.(0) and res.(0) must be the same *)
     Iintop(Iadd|Isub|Imul|Iand|Ior|Ixor)
   | Ifloatop(Iaddf|Isubf|Imulf|Idivf) ->
-      ([|res.(0); arg.(1)|], res)
-  (* One-address unary operations: arg.(0) and res.(0) must be the same *)
-  | Iintop_imm((Iadd|Isub|Imul|Iand|Ior|Ixor|Ilsl|Ilsr|Iasr), _)
+      same_reg_res0_arg0 arg res
   | Ifloatop(Iabsf | Inegf)
   | Ispecific(Ibswap (32|64)) ->
-      (res, res)
+     (* CR gyorsh: this is not equivalent to the previously used [(res, res)],
+        where physically the same arrays are passed. *)
+     same_reg_res0_arg0 arg res
   (* For xchg, args must be a register allowing access to high 8 bit register
      (rax, rbx, rcx or rdx). Keep it simple, just force the argument in rax. *)
   | Ispecific(Ibswap 16) ->
@@ -108,9 +122,13 @@ let pseudoregs_for_operation op arg res operands =
      rdx. *)
   | Iintop(Imulh _) ->
       ([| rax; arg.(1) |], [| rdx |])
-  (* For shifts with variable shift count, second arg must be in rcx *)
   | Iintop(Ilsl|Ilsr|Iasr) ->
-      ([|res.(0); rcx|], res)
+     (* arg.(0) and res.(0) must be the same *)
+     if is_immediate operands ~index:1 then
+       same_reg_res0_arg0 arg res
+     else
+       (* For shifts with variable shift count, second arg must be in rcx *)
+       ([|res.(0); rcx|], res)
   (* For div and mod, first arg must be in rax, rdx is clobbered,
      and result is in rax or rdx respectively.
      Keep it simple, just force second argument in rcx. *)
@@ -142,8 +160,6 @@ let pseudoregs_for_operation op arg res operands =
     ([|res.(0); arg.(1)|], res)
   (* Other instructions are regular *)
   | Iintop (Ipopcnt|Iclz _|Ictz _|Icomp _|Icheckbound)
-  | Iintop_imm ((Imulh _|Idiv|Imod|Icomp _|Icheckbound
-                |Ipopcnt|Iclz _|Ictz _), _)
   | Ispecific (Isqrtf|Isextend32|Izextend32|Ilea _|Istore_int (_, _, _)
               |Ifloat_iround|Ifloat_round _
               |Ioffset_loc (_, _)|Ifloatsqrtf _|Irdtsc|Iprefetch _)
@@ -217,18 +233,18 @@ method select_addressing _chunk exp =
   let (a, d) = select_addr exp in
   (* PR#4625: displacement must be a signed 32-bit immediate *)
   if not (is_immediate d)
-  then (Iindexed 0, exp)
+  then (Iindexed 0, exp, 0)
   else match a with
     | Asymbol s ->
-        (Ibased(s, d), Ctuple [])
+        (Ibased(s, d), Ctuple [], 0)
     | Alinear e ->
-        (Iindexed d, e)
+        (Iindexed d, e, 1)
     | Aadd(e1, e2) ->
-        (Iindexed2 d, Ctuple[e1; e2])
+        (Iindexed2 d, Ctuple[e1; e2], 2)
     | Ascale(e, scale) ->
-        (Iscaled(scale, d), e)
+        (Iscaled(scale, d), e, 1)
     | Ascaledadd(e1, e2, scale) ->
-        (Iindexed2scaled(scale, d), Ctuple[e1; e2])
+        (Iindexed2scaled(scale, d), Ctuple[e1; e2], 2)
 
 method! select_store is_assign addr exp =
   match exp with
@@ -250,16 +266,16 @@ method! select_operation op args dbg =
   (* Recognize the LEA instruction *)
     Caddi | Caddv | Cadda | Csubi ->
       begin match self#select_addressing Word_int (Cop(op, args, dbg)) with
-        (Iindexed _, _)
-      | (Iindexed2 0, _) -> super#select_operation op args dbg
+        (Iindexed _, _, _)
+      | (Iindexed2 0, _, _) -> super#select_operation op args dbg
       | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr,
-         arg) -> (Ispecific(Ilea addr), [arg], [||])
+         arg, _) -> (Ispecific(Ilea addr), [arg], [||])
       end
   (* Recognize float arithmetic with memory. *)
   | Cextcall { func = "sqrt"; alloc = false; } ->
      begin match args with
        [Cop(Cload ((Double as chunk), _), [loc], _dbg)] ->
-         let (addr, arg) = self#select_addressing chunk loc in
+         let (addr, arg, _) = self#select_addressing chunk loc in
          (Ispecific(Ifloatsqrtf addr), [arg], [||])
      | [arg] ->
          (Ispecific Isqrtf, [arg], [||])
@@ -302,7 +318,7 @@ method! select_operation op args dbg =
       begin match args with
         [loc; Cop(Caddi, [Cop(Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
         when loc = loc' && is_immediate n ->
-          let (addr, arg) = self#select_addressing chunk loc in
+          let (addr, arg, _) = self#select_addressing chunk loc in
           (Ispecific(Ioffset_loc(n, addr)), [arg], [||])
       | _ ->
           super#select_operation op args dbg
@@ -344,7 +360,7 @@ method! select_operation op args dbg =
         | Moderate when is_write && not !prefetchwt1_support -> High
         | l -> l
       in
-      let addr, eloc =
+      let addr, eloc, _ =
         self#select_addressing Word_int (one_arg "prefetch" args)
       in
       Ispecific (Iprefetch { is_write; addr; locality; }), [eloc], [||]

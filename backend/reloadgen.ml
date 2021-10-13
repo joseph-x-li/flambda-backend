@@ -57,7 +57,7 @@ method private makereg1 rv =
   newv.(0) <- self#makereg rv.(0);
   newv
 
-method reload_operation op arg res =
+method reload_operation op arg res operands =
   (* By default, assume that arguments and results must reside
      in hardware registers. For moves, allow one arg or one
      res to be stack-allocated, but do something for
@@ -82,7 +82,7 @@ method reload_operation op arg res =
   | _ ->
       (self#makeregs arg, self#makeregs res)
 
-method reload_test _tst args =
+method reload_test _tst args operands =
   self#makeregs args
 
 method private reload i k =
@@ -104,13 +104,13 @@ method private reload i k =
         k (insert_moves i.arg newarg
              {i with arg = newarg; next; }))
   | Iop op ->
-      let (newarg, newres) = self#reload_operation op i.arg i.res in
+      let (newarg, newres) = self#reload_operation op i.arg i.res i.operands in
       self#reload i.next (fun next ->
         k (insert_moves i.arg newarg
              {i with arg = newarg; res = newres;
                      next = (insert_moves newres i.res next); }))
   | Iifthenelse(tst, ifso, ifnot) ->
-      let newarg = self#reload_test tst i.arg in
+      let newarg = self#reload_test tst i.arg i.operands in
       self#reload ifso (fun ifso ->
         self#reload ifnot (fun ifnot ->
           self#reload i.next (fun next ->

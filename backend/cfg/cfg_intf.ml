@@ -51,7 +51,7 @@ module S = struct
         { bytes : int;
           dbginfo : Debuginfo.alloc_dbginfo
         }
-    | Checkbound of { immediate : int option }
+    | Checkbound
 
   type operation =
     | Move
@@ -64,7 +64,6 @@ module S = struct
     | Load of Cmm.memory_chunk * Arch.addressing_mode
     | Store of Cmm.memory_chunk * Arch.addressing_mode * bool
     | Intop of Mach.integer_operation
-    | Intop_imm of Mach.integer_operation * int
     | Floatop of Mach.float_operation
     | Floatofint
     | Intoffloat
