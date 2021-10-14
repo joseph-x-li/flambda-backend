@@ -52,17 +52,23 @@ let regs ppf v =
 let operand arg ppf = function
   | Ireg i -> fprintf ppf "reg %a" reg arg.(i)
   | Iimm i -> fprintf ppf "imm %i" i
-  | Imem (a, [|i;_|]) -> fprintf ppf "mem %a"
-                           (Arch.print_addressing reg a)
-                           (Array.sub arg i (Array.length arg - i))
-  | Imem _ -> Misc.fatal_error "Printmach.operand: unexpected Imem"
+  | Imem (a, [| |]) -> fprintf ppf "mem %a"
+                         (Arch.print_addressing reg a)
+                         [||]
+  | Imem (a, r) ->
+    let i = r.(0) in
+    fprintf ppf "mem %a"
+      (Arch.print_addressing reg a)
+      (Array.sub arg i (Array.length arg - i))
+
+
 
 let operands arg ppf v =
   match Array.length v with
   | 0 -> ()
   | 1 -> (operand arg) ppf v.(0)
   | n -> (operand arg) ppf v.(0);
-         for i = 1 to n-1 do fprintf ppf " %a" (operand arg) v.(i) done
+         for i = 1 to n-1 do fprintf ppf ", %a" (operand arg) v.(i) done
 
 let regset ppf s =
   let first = ref true in
@@ -142,7 +148,7 @@ let test tst ops ppf arg =
         assert (Array.length arg = 2);
         fprintf ppf "%a%s%a" reg arg.(0) (intcomp cmp) reg arg.(1)
       end else begin
-        fprintf ppf "%s " (intcomp cmp)
+        fprintf ppf "%s (%a)" (intcomp cmp) (operands arg) ops;
       end
   | Ifloattest cmp ->
       fprintf ppf "%a%s%a"
@@ -152,7 +158,7 @@ let test tst ops ppf arg =
 
 let operation op arg ppf res ops =
   if Array.length res > 0 then fprintf ppf "%a := " regs res;
-  if Array.length ops > 0 then fprintf ppf "(%a)" (operands arg) ops;
+  if Array.length ops > 0 then fprintf ppf "(%a) " (operands arg) ops;
   match op with
   | Imove -> regs ppf arg
   | Ispill -> fprintf ppf "%a (spill)" regs arg
@@ -199,7 +205,7 @@ let operation op arg ppf res ops =
         assert (Array.length arg = 1);
         fprintf ppf "%s%a" (floatop op) reg arg.(0)
       end else begin
-        assert (Array.length arg = 2);
+        assert (Array.length arg > 1);
         fprintf ppf "%a%s%a" reg arg.(0) (floatop op) reg arg.(1)
       end
   | Ifloatofint -> fprintf ppf "floatofint %a" reg arg.(0)
