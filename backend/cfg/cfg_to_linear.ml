@@ -251,10 +251,10 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
         let imm =
           match Array.length terminator.operands with
           | 0 -> None
-          | 2 ->
-            (match terminator.operands.(1) with
-             | Iimm n -> Some n
-             | Ireg _ | Imem _ -> None)
+          | 2 -> (
+            match terminator.operands.(1) with
+            | Iimm n -> Some n
+            | Ireg _ | Imem _ -> None)
           | _ -> assert false
         in
         let can_emit_Lcondbranch3 =

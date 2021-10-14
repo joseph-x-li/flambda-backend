@@ -346,12 +346,12 @@ let of_cmm_float_test ~lbl ~inv (cmp : Cmm.float_comparison) : C.float_test =
 let of_cmm_int_test ~lbl ~inv ~is_signed (cmp : Cmm.integer_comparison) :
     C.int_test =
   match cmp with
-  | Ceq -> { eq = lbl; lt = inv; gt = inv; is_signed; }
-  | Clt -> { eq = inv; lt = lbl; gt = inv; is_signed; }
-  | Cgt -> { eq = inv; lt = inv; gt = lbl; is_signed; }
-  | Cne -> { eq = inv; lt = lbl; gt = lbl; is_signed; }
-  | Cle -> { eq = lbl; lt = lbl; gt = inv; is_signed; }
-  | Cge -> { eq = lbl; lt = inv; gt = lbl; is_signed; }
+  | Ceq -> { eq = lbl; lt = inv; gt = inv; is_signed }
+  | Clt -> { eq = inv; lt = lbl; gt = inv; is_signed }
+  | Cgt -> { eq = inv; lt = inv; gt = lbl; is_signed }
+  | Cne -> { eq = inv; lt = lbl; gt = lbl; is_signed }
+  | Cle -> { eq = lbl; lt = lbl; gt = inv; is_signed }
+  | Cge -> { eq = lbl; lt = inv; gt = lbl; is_signed }
 
 let mk_int_test ~lbl ~inv (cmp : Mach.integer_comparison) : C.int_test =
   match cmp with

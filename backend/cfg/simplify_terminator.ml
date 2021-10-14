@@ -45,10 +45,11 @@ let simplify_switch (block : C.basic_block) labels =
             if Label.equal hd l then (hd, n + 1) :: tl else (l, 1) :: acc)
       labels []
   in
-  let operands : int -> Mach.operand array = fun imm ->
+  let operands : int -> Mach.operand array =
+   fun imm ->
     match Array.length block.terminator.operands with
-    | 0 -> [| Mach.Ireg 0; Iimm imm; |]
-    | 1 -> [| block.terminator.operands.(0); Iimm imm; |]
+    | 0 -> [| Mach.Ireg 0; Iimm imm |]
+    | 1 -> [| block.terminator.operands.(0); Iimm imm |]
     | _ -> assert false
   in
   match labels_with_counts with
@@ -59,23 +60,17 @@ let simplify_switch (block : C.basic_block) labels =
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(n) ln);
     assert (len = n + k);
-    let desc =
-      C.Int_test { is_signed = false; lt = l0; eq = ln; gt = ln }
-    in
+    let desc = C.Int_test { is_signed = false; lt = l0; eq = ln; gt = ln } in
     block.terminator <- { block.terminator with desc; operands = operands n }
   | [(l0, m); (l1, 1); (l2, _)] when Label.equal l0 l2 ->
-    let desc =
-      C.Int_test { is_signed = false; lt = l0; eq = l1; gt = l0 }
-    in
-    block.terminator <- { block.terminator with desc; operands = operands m}
+    let desc = C.Int_test { is_signed = false; lt = l0; eq = l1; gt = l0 } in
+    block.terminator <- { block.terminator with desc; operands = operands m }
   | [(l0, 1); (l1, 1); (l2, n)] ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(1) l1);
     assert (Label.equal labels.(2) l2);
     assert (len = n + 2);
-    let desc =
-      C.Int_test { is_signed = false; lt = l0; eq = l1; gt = l2 }
-    in
+    let desc = C.Int_test { is_signed = false; lt = l0; eq = l1; gt = l2 } in
     block.terminator <- { block.terminator with desc; operands = operands 1 }
   | _ -> ()
 

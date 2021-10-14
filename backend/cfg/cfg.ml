@@ -268,9 +268,7 @@ let dump_terminator ppf ?(sep = "\n") ti =
     fprintf ppf "if > goto %d%s" gt sep;
     fprintf ppf "if uo goto %d%s" uo sep
   | Int_test { lt; eq; gt; is_signed } ->
-    let cmp =
-      if is_signed then " s" else " u"
-    in
+    let cmp = if is_signed then " s" else " u" in
     fprintf ppf "if <%s goto %d%s" cmp lt sep;
     fprintf ppf "if =%s goto %d%s" cmp eq sep;
     fprintf ppf "if >%s goto %d%s" cmp gt sep
