@@ -198,11 +198,10 @@ let float_test_of_float_comparison :
 let int_test_of_integer_comparison :
     Cmm.integer_comparison ->
     signed:bool ->
-    immediate:int option ->
     label_false:Label.t ->
     label_true:Label.t ->
     Cfg.int_test =
- fun comparison ~signed:is_signed ~immediate:imm ~label_false ~label_true ->
+ fun comparison ~signed:is_signed ~label_false ~label_true ->
   let lt, eq, gt =
     match comparison with
     | Ceq -> label_false, label_true, label_false
@@ -212,26 +211,23 @@ let int_test_of_integer_comparison :
     | Cle -> label_true, label_true, label_false
     | Cge -> label_false, label_true, label_true
   in
-  { lt; eq; gt; is_signed; imm }
+  { lt; eq; gt; is_signed }
 
 let terminator_of_test :
     Mach.test -> label_false:Label.t -> label_true:Label.t -> Cfg.terminator =
  fun test ~label_false ~label_true ->
-  let int_test comparison immediate =
+  let int_test comparison =
     let signed, comparison =
       match comparison with
       | Mach.Isigned comparison -> true, comparison
       | Mach.Iunsigned comparison -> false, comparison
     in
-    int_test_of_integer_comparison comparison ~signed ~immediate ~label_false
-      ~label_true
+    int_test_of_integer_comparison comparison ~signed ~label_false ~label_true
   in
   match test with
   | Itruetest -> Truth_test { ifso = label_true; ifnot = label_false }
   | Ifalsetest -> Truth_test { ifso = label_false; ifnot = label_true }
-  | Iinttest comparison -> Int_test (int_test comparison None)
-  | Iinttest_imm (comparison, value) ->
-    Int_test (int_test comparison (Some value))
+  | Iinttest comparison -> Int_test (int_test comparison)
   | Ifloattest comparison ->
     Float_test
       (float_test_of_float_comparison comparison ~label_false ~label_true)

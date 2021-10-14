@@ -71,8 +71,14 @@ module Make (T : Branch_relaxation_intf.S) = struct
       match lbl with
       | None -> next
       | Some l ->
-        instr_cons (Lcondbranch (Iinttest_imm (Isigned Cmm.Ceq, n), l))
-          arg [||] operands next
+        let new_operands =
+          match Array.length operands with
+          | 0 ->  [| Ireg 0; Iimm n; |]
+          | 1 ->  [| operands.(0); Iimm n; |]
+          | _ -> assert false
+        in
+        instr_cons (Lcondbranch (Iinttest (Isigned Cmm.Ceq), l))
+          [| arg.(0) |] [||] new_operands next
     in
     let rec fixup did_fix pc instr =
       match instr.desc with

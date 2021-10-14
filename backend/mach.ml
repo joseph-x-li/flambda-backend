@@ -43,7 +43,6 @@ type test =
     Itruetest
   | Ifalsetest
   | Iinttest of integer_comparison
-  | Iinttest_imm of integer_comparison * int
   | Ifloattest of float_comparison
   | Ioddtest
   | Ieventest

@@ -78,7 +78,7 @@ let successor_labels_normal ti =
   | Float_test { lt; gt; eq; uo } ->
     Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
     |> Label.Set.add uo
-  | Int_test { lt; gt; eq; imm = _; is_signed = _ } ->
+  | Int_test { lt; gt; eq; is_signed = _ } ->
     Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
 
 let successor_labels ~normal ~exn block =
@@ -113,8 +113,8 @@ let replace_successor_labels t ~normal ~exn block ~f =
         Parity_test { ifso = f ifso; ifnot = f ifnot }
       | Truth_test { ifso; ifnot } ->
         Truth_test { ifso = f ifso; ifnot = f ifnot }
-      | Int_test { lt; eq; gt; is_signed; imm } ->
-        Int_test { lt = f lt; eq = f eq; gt = f gt; is_signed; imm }
+      | Int_test { lt; eq; gt; is_signed } ->
+        Int_test { lt = f lt; eq = f eq; gt = f gt; is_signed }
       | Float_test { lt; eq; gt; uo } ->
         Float_test { lt = f lt; eq = f eq; gt = f gt; uo = f uo }
       | Switch labels -> Switch (Array.map f labels)
@@ -267,11 +267,9 @@ let dump_terminator ppf ?(sep = "\n") ti =
     fprintf ppf "if = goto %d%s" eq sep;
     fprintf ppf "if > goto %d%s" gt sep;
     fprintf ppf "if uo goto %d%s" uo sep
-  | Int_test { lt; eq; gt; is_signed; imm } ->
+  | Int_test { lt; eq; gt; is_signed } ->
     let cmp =
-      Printf.sprintf " %s%s"
-        (if is_signed then "s" else "u")
-        (match imm with None -> "" | Some i -> " " ^ Int.to_string i)
+      if is_signed then " s" else " u"
     in
     fprintf ppf "if <%s goto %d%s" cmp lt sep;
     fprintf ppf "if =%s goto %d%s" cmp eq sep;

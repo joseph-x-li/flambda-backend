@@ -100,7 +100,6 @@ module S = struct
       eq : Label.t;  (** if x = y (resp. x = n) goto [eq] label *)
       gt : Label.t;  (** if x > y (resp. x > n) goto [gt] label *)
       is_signed : bool;
-      imm : int option
     }
 
   (** [float_test] represents possible outcomes of comparison between arguments

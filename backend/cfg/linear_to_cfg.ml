@@ -343,20 +343,20 @@ let of_cmm_float_test ~lbl ~inv (cmp : Cmm.float_comparison) : C.float_test =
   | CFnle -> { eq = inv; lt = inv; gt = lbl; uo = lbl }
   | CFnge -> { eq = inv; lt = lbl; gt = inv; uo = lbl }
 
-let of_cmm_int_test ~lbl ~inv ~is_signed ~imm (cmp : Cmm.integer_comparison) :
+let of_cmm_int_test ~lbl ~inv ~is_signed (cmp : Cmm.integer_comparison) :
     C.int_test =
   match cmp with
-  | Ceq -> { eq = lbl; lt = inv; gt = inv; is_signed; imm }
-  | Clt -> { eq = inv; lt = lbl; gt = inv; is_signed; imm }
-  | Cgt -> { eq = inv; lt = inv; gt = lbl; is_signed; imm }
-  | Cne -> { eq = inv; lt = lbl; gt = lbl; is_signed; imm }
-  | Cle -> { eq = lbl; lt = lbl; gt = inv; is_signed; imm }
-  | Cge -> { eq = lbl; lt = inv; gt = lbl; is_signed; imm }
+  | Ceq -> { eq = lbl; lt = inv; gt = inv; is_signed; }
+  | Clt -> { eq = inv; lt = lbl; gt = inv; is_signed; }
+  | Cgt -> { eq = inv; lt = inv; gt = lbl; is_signed; }
+  | Cne -> { eq = inv; lt = lbl; gt = lbl; is_signed; }
+  | Cle -> { eq = lbl; lt = lbl; gt = inv; is_signed; }
+  | Cge -> { eq = lbl; lt = inv; gt = lbl; is_signed; }
 
-let mk_int_test ~lbl ~inv ~imm (cmp : Mach.integer_comparison) : C.int_test =
+let mk_int_test ~lbl ~inv (cmp : Mach.integer_comparison) : C.int_test =
   match cmp with
-  | Isigned cmp -> of_cmm_int_test ~lbl ~inv cmp ~is_signed:true ~imm
-  | Iunsigned cmp -> of_cmm_int_test ~lbl ~inv cmp ~is_signed:false ~imm
+  | Isigned cmp -> of_cmm_int_test ~lbl ~inv cmp ~is_signed:true
+  | Iunsigned cmp -> of_cmm_int_test ~lbl ~inv cmp ~is_signed:false
 
 let block_is_registered t (block : C.basic_block) =
   Label.Tbl.mem t.cfg.blocks block.start
@@ -510,9 +510,7 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
       | Itruetest -> Truth_test { ifso = lbl; ifnot = inv }
       | Ifalsetest -> Truth_test { ifso = inv; ifnot = lbl }
       | Ifloattest cmp -> Float_test (of_cmm_float_test cmp ~lbl ~inv)
-      | Iinttest cmp -> Int_test (mk_int_test cmp ~lbl ~inv ~imm:None)
-      | Iinttest_imm (cmp, n) ->
-        Int_test (mk_int_test cmp ~lbl ~inv ~imm:(Some n))
+      | Iinttest cmp -> Int_test (mk_int_test cmp ~lbl ~inv)
     in
     add_terminator t block i desc ~trap_depth ~traps;
     create_blocks t fallthrough.insn block ~trap_depth ~traps
@@ -520,14 +518,19 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
     let fallthrough = get_or_make_label t i.next in
     let get_dest lbl = Option.value lbl ~default:fallthrough.label in
     let it : C.int_test =
-      { imm = Some 1;
-        is_signed = false;
+      { is_signed = false;
         lt = get_dest lbl0;
         eq = get_dest lbl1;
         gt = get_dest lbl2
       }
     in
-    add_terminator t block i (Int_test it) ~trap_depth ~traps;
+    let operands =
+      match Array.length i.operands with
+      | 0 -> [| Mach.Ireg 0; Mach.Iimm 1 |]
+      | 1 -> [| i.operands.(0); Mach.Iimm 1 |]
+      | _ -> assert false
+    in
+    add_terminator t block { i with operands } (Int_test it) ~trap_depth ~traps;
     create_blocks t fallthrough.insn block ~trap_depth ~traps
   | Lswitch labels ->
     (* CR-someday gyorsh: get rid of switches entirely and re-generate them

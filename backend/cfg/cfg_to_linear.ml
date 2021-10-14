@@ -228,7 +228,7 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
         in
         branches @ branch_or_fallthrough last, None
       | _ -> assert false)
-    | Int_test { lt; eq; gt; imm; is_signed } -> (
+    | Int_test { lt; eq; gt; is_signed } -> (
       let successor_labels =
         Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
       in
@@ -248,6 +248,15 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
         let cond_successor_labels = Label.Set.remove last successor_labels in
         (* Lcondbranch3 is emitted as an unsigned comparison, see ocaml PR
            #8677 *)
+        let imm =
+          match Array.length terminator.operands with
+          | 0 -> None
+          | 2 ->
+            (match terminator.operands.(1) with
+             | Iimm n -> Some n
+             | Ireg _ | Imem _ -> None)
+          | _ -> assert false
+        in
         let can_emit_Lcondbranch3 =
           match is_signed, imm with
           | false, Some 1 -> true
@@ -271,11 +280,7 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
                   | true -> Mach.Isigned cond
                   | false -> Mach.Iunsigned cond
                 in
-                let test =
-                  match imm with
-                  | None -> Mach.Iinttest comp
-                  | Some n -> Mach.Iinttest_imm (comp, n)
-                in
+                let test = Mach.Iinttest comp in
                 L.Lcondbranch (test, lbl) :: acc)
               cond_successor_labels init,
             None )

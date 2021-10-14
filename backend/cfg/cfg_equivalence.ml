@@ -391,6 +391,19 @@ let rec check_basic_instruction_list :
     check_basic_instruction state location idx expected_hd result_hd;
     check_basic_instruction_list state location (succ idx) expected_tl result_tl
 
+let imm : 'a Cfg.instruction -> index:int -> int option = fun i ~index ->
+  match Array.length i.operands with
+  | 0 -> None
+  | _ ->
+    match i.operands.(index) with
+    | Iimm n -> Some n
+    | Ireg _ | Imem _ -> None
+
+let special_immediates expected result =
+  match imm expected ~index:1, imm result ~index:1 with
+  | Some imm1, Some imm2 -> Int.equal imm1 (Int.pred imm2)
+  | None, _ | _, None -> false
+
 let check_terminator_instruction :
     State.t ->
     location ->
@@ -417,10 +430,10 @@ let check_terminator_instruction :
       State.add_to_explore state gt1 gt2;
       State.add_to_explore state uo1 uo2
     | ( Int_test
-          { lt = lt1; eq = eq1; gt = gt1; is_signed = is_signed1; imm = imm1 },
+          { lt = lt1; eq = eq1; gt = gt1; is_signed = is_signed1; },
         Int_test
-          { lt = lt2; eq = eq2; gt = gt2; is_signed = is_signed2; imm = imm2 } )
-      when Bool.equal is_signed1 is_signed2 && Option.equal Int.equal imm1 imm2
+          { lt = lt2; eq = eq2; gt = gt2; is_signed = is_signed2; } )
+      when Bool.equal is_signed1 is_signed2
       ->
       State.add_to_explore state lt1 lt2;
       State.add_to_explore state eq1 eq2;
@@ -432,17 +445,15 @@ let check_terminator_instruction :
             eq = eq1;
             gt = gt1;
             is_signed = is_signed1;
-            imm = Some imm1
           },
         Int_test
           { lt = lt2;
             eq = eq2;
             gt = gt2;
             is_signed = is_signed2;
-            imm = Some imm2
           } )
       when Bool.equal is_signed1 is_signed2
-           && Int.equal imm1 (Int.pred imm2)
+           && special_immediates expected result
            && Label.equal lt1 eq1 && Label.equal eq2 gt2 ->
       State.add_to_explore state lt1 lt2;
       State.add_to_explore state gt1 gt2

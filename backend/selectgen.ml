@@ -658,18 +658,18 @@ method select_condition cond =
   match cond with
   | Cop(Ccmpi cmp, [arg1; Cconst_int (n, _)], _)
     when self#is_immediate_test (Isigned cmp) n ->
-      (Iinttest_imm(Isigned cmp, n), arg1, [||])
+      (Iinttest(Isigned cmp), arg1, [|Ireg 0; Iimm n;|])
   | Cop(Ccmpi cmp, [Cconst_int (n, _); arg2], _)
     when self#is_immediate_test (Isigned (swap_integer_comparison cmp)) n ->
-      (Iinttest_imm(Isigned(swap_integer_comparison cmp), n), arg2, [||])
+    (Iinttest(Isigned(swap_integer_comparison cmp)), arg2, [|Ireg 0; Iimm n;|])
   | Cop(Ccmpi cmp, args, _) ->
       (Iinttest(Isigned cmp), Ctuple args, [||])
   | Cop(Ccmpa cmp, [arg1; Cconst_int (n, _)], _)
     when self#is_immediate_test (Iunsigned cmp) n ->
-      (Iinttest_imm(Iunsigned cmp, n), arg1, [||])
+      (Iinttest(Iunsigned cmp), arg1, [|Ireg 0; Iimm n;|])
   | Cop(Ccmpa cmp, [Cconst_int (n, _); arg2], _)
     when self#is_immediate_test (Iunsigned (swap_integer_comparison cmp)) n ->
-      (Iinttest_imm(Iunsigned(swap_integer_comparison cmp), n), arg2, [||])
+      (Iinttest(Iunsigned(swap_integer_comparison cmp)), arg2, [|Ireg 0; Iimm n;|])
   | Cop(Ccmpa cmp, args, _) ->
       (Iinttest(Iunsigned cmp), Ctuple args, [||])
   | Cop(Ccmpf cmp, args, _) ->

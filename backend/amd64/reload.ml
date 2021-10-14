@@ -229,7 +229,6 @@ method! reload_test tst arg operands =
       if mem_or_stack arg operands ~index:0
       then [| self#makereg arg.(0); arg.(1) |]
       else arg
-  | Iinttest_imm (_, _)
   | Itruetest
   | Ifalsetest
   | Ioddtest

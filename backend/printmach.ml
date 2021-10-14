@@ -133,12 +133,17 @@ let floatop = function
   | Idivf -> " /f "
   | Icompf cmp -> floatcomp cmp
 
-let test tst ppf arg =
+let test tst ops ppf arg =
   match tst with
   | Itruetest -> reg ppf arg.(0)
   | Ifalsetest -> fprintf ppf "not %a" reg arg.(0)
-  | Iinttest cmp -> fprintf ppf "%a%s%a" reg arg.(0) (intcomp cmp) reg arg.(1)
-  | Iinttest_imm(cmp, n) -> fprintf ppf "%a%s%i" reg arg.(0) (intcomp cmp) n
+  | Iinttest cmp ->
+      if Array.length ops = 0 then begin
+        assert (Array.length arg = 2);
+        fprintf ppf "%a%s%a" reg arg.(0) (intcomp cmp) reg arg.(1)
+      end else begin
+        fprintf ppf "%s " (intcomp cmp)
+      end
   | Ifloattest cmp ->
       fprintf ppf "%a%s%a"
        reg arg.(0) (floatcomp cmp) reg arg.(1)
@@ -236,7 +241,7 @@ let rec instr ppf i =
   | Ireturn traps ->
       fprintf ppf "return%a %a" Printcmm.trap_action_list traps regs i.arg
   | Iifthenelse(tst, ifso, ifnot) ->
-      fprintf ppf "@[<v 2>if %a then@,%a" (test tst) i.arg instr ifso;
+      fprintf ppf "@[<v 2>if %a then@,%a" (test tst i.operands) i.arg instr ifso;
       begin match ifnot.desc with
       | Iend -> ()
       | _ -> fprintf ppf "@;<0 -2>else@,%a" instr ifnot
