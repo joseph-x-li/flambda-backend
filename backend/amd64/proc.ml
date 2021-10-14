@@ -413,8 +413,9 @@ let op_is_pure = function
   | Ispecific(Ilea _ | Isextend32 | Izextend32 | Ifloat_iround | Ifloat_round _
              | Ifloat_min | Ifloat_max) -> true
   | Ispecific(Irdtsc | Irdpmc | Icrc32q | Istore_int (_, _, _)
-             | Ioffset_loc (_, _) | Ifloatarithmem (_, _)
+             | Ioffset_loc (_, _)
              | Ibswap _ | Ifloatsqrtf _ | Isqrtf)-> false
+  | Ispecific(Ifloatarithmem (_, _)) -> true
   | Iprobe _ | Iprobe_is_enabled _-> false
   | Iintop(Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
           | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _|Ictz _|Icomp _)
