@@ -599,9 +599,8 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
     | Iextcall _ | Istackoffset _
     | Iload (_, _)
     | Istore (_, _, _)
-    | Ialloc _ | Iintop _
-    | Iopaque | Iprobe _ | Iprobe_is_enabled _ | Ispecific _
-    | Iname_for_debugger _ ->
+    | Ialloc _ | Iintop _ | Iopaque | Iprobe _ | Iprobe_is_enabled _
+    | Ispecific _ | Iname_for_debugger _ ->
       let desc = to_basic mop in
       block.body <- create_instruction t desc i ~trap_depth :: block.body;
       if Mach.operation_can_raise mop then record_exn t block traps;
