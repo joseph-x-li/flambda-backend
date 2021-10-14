@@ -50,7 +50,6 @@ module Equations = struct
   let add op_class op v m =
     match op_class with
     | Op_load ->
-      (* CR gyorsh:  update for memory operands *)
       { m with load_equations = Rhs_map.add op v m.load_equations }
     | _ ->
       { m with other_equations = Rhs_map.add op v m.other_equations }
@@ -225,12 +224,19 @@ let rec combine3 l1 l2 l3 =
   | (a1::l1, a2::l2, a3::l3) -> (a1, a2, a3) :: combine3 l1 l2 l3
   | (_, _, _) -> invalid_arg "combine3"
 
+let is_memory operands =
+  let is_memory = function
+    | Iimm _ | Ireg _ -> false
+    | Imem _ -> true
+  in
+  Array.exists is_memory operands
+
 class cse_generic = object (self)
 
 (* Default classification of operations.  Can be overridden in
    processor-specific files to classify specific operations better. *)
 
-method class_of_operation op =
+method class_of_operation op operands =
   match op with
   | Imove | Ispill | Ireload -> assert false   (* treated specially *)
   | Iconst_int _ | Iconst_float _ | Iconst_symbol _ -> Op_pure
@@ -241,9 +247,9 @@ method class_of_operation op =
   | Istore(_,_,asg) -> Op_store asg
   | Ialloc _ -> assert false                   (* treated specially *)
   | Iintop(Icheckbound) -> Op_checkbound
-  | Iintop _ -> Op_pure
+  | Iintop _ -> if is_memory operands then Op_load else Op_pure
   | Ifloatop _
-  | Ifloatofint | Iintoffloat -> Op_pure
+  | Ifloatofint | Iintoffloat -> if is_memory operands then Op_load else Op_pure
   | Ispecific _ -> Op_other
   | Iname_for_debugger _ -> Op_pure
   | Iprobe_is_enabled _ -> Op_other
@@ -306,7 +312,7 @@ method private cse n i k =
        let n2 = set_unknown_regs n1 i.res in
        self#cse n2 i.next (fun next -> k { i with next; })
   | Iop op ->
-      begin match self#class_of_operation op with
+      begin match self#class_of_operation op i.operands with
       | (Op_pure | Op_checkbound | Op_load) as op_class ->
           let (n1, varg) = valnum_regs n i.arg in
           let n2 = set_unknown_regs n1 (Proc.destroyed_at_oper i.desc) in
