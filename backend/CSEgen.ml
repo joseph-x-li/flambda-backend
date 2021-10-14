@@ -33,7 +33,7 @@ type op_class =
        valnums = operation(valnums)
    plus a mapping from registers to valnums (value numbers). *)
 
-type rhs = operation * valnum array
+type rhs = operation * operand array * valnum array
 
 module Equations = struct
   module Rhs_map =
@@ -50,6 +50,7 @@ module Equations = struct
   let add op_class op v m =
     match op_class with
     | Op_load ->
+      (* CR gyorsh:  update for memory operands *)
       { m with load_equations = Rhs_map.add op v m.load_equations }
     | _ ->
       { m with other_equations = Rhs_map.add op v m.other_equations }
@@ -309,7 +310,7 @@ method private cse n i k =
       | (Op_pure | Op_checkbound | Op_load) as op_class ->
           let (n1, varg) = valnum_regs n i.arg in
           let n2 = set_unknown_regs n1 (Proc.destroyed_at_oper i.desc) in
-          begin match find_equation op_class n1 (op, varg) with
+          begin match find_equation op_class n1 (op, i.operands, varg) with
           | Some vres ->
               (* This operation was computed earlier. *)
               (* Are there registers that hold the results computed earlier? *)
@@ -334,7 +335,7 @@ method private cse n i k =
               end
           | None ->
               (* This operation produces a result we haven't seen earlier. *)
-              let n3 = set_fresh_regs n2 i.res (op, varg) op_class in
+              let n3 = set_fresh_regs n2 i.res (op, i.operands, varg) op_class in
               self#cse n3 i.next (fun next -> k { i with next; })
           end
       | Op_store false | Op_other ->
