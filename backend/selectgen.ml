@@ -615,18 +615,6 @@ method memory_operands_supported _op _c = false
  *   | _ -> (arg, Ireg 0) *)
 
 method select_operands op args =
-  let chunk op =
-    match op with
-    (* CR gyorsh: why Word_int and not Val_int or other int types? *)
-    | Iintop _ -> Word_int
-    | Ifloatop _ | Ifloatofint | Iintoffloat -> Double
-    | Imove | Ispill | Ireload | Icall_ind | Itailcall_ind | Iopaque
-    | Iconst_int _ | Iconst_float _ | Iconst_symbol _
-    | Icall_imm _ | Itailcall_imm _ | Iextcall _
-    | Istackoffset _ | Iload (_, _) | Istore (_, _, _) | Ialloc _
-    | Ispecific _| Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _
-      -> assert false
-  in
   let swap =
     match op with
     | Iintop (Icomp cmp) -> Some(Iintop(Icomp (swap_intcomp cmp)))
@@ -654,8 +642,7 @@ method select_operands op args =
     ((Option.get swap), [arg], [|Ireg 0; Iimm n|])
   (* Memory operands *)
   | [Cop(Cload (c, _), [loc], _dbg)]
-    when self#memory_operands_supported op c
-      && equal_memory_chunk (chunk op) c ->
+    when self#memory_operands_supported op c ->
     let (addr, arg, len) = self#select_addressing c loc in
     (op, [arg], [| mem_operand c addr ~index:0 ~len |])
   | [arg1; Cop(Cload (c, _), [loc2], _)]
@@ -675,26 +662,23 @@ method select_operands op args =
 
 (* Instruction selection for conditionals *)
 
+
 method select_condition cond =
+  (* CR gyorsh: fix this after operands and args are refactored into one *)
+  let hack tmp_op args =
+    let new_op, new_args, new_operands = self#select_operands tmp_op args in
+    match new_op with
+    | Iintop (Icomp new_cmp) -> Iinttest new_cmp, Ctuple new_args, new_operands
+    | Ifloatop (Icompf new_cmp) -> Ifloattest new_cmp, Ctuple new_args, new_operands
+    | _ -> assert false
+  in
   match cond with
-  | Cop(Ccmpi cmp, [arg1; Cconst_int (n, _)], _)
-    when self#is_immediate_test (Isigned cmp) n ->
-      (Iinttest(Isigned cmp), arg1, [|Ireg 0; Iimm n;|])
-  | Cop(Ccmpi cmp, [Cconst_int (n, _); arg2], _)
-    when self#is_immediate_test (Isigned (swap_integer_comparison cmp)) n ->
-    (Iinttest(Isigned(swap_integer_comparison cmp)), arg2, [|Ireg 0; Iimm n;|])
   | Cop(Ccmpi cmp, args, _) ->
-      (Iinttest(Isigned cmp), Ctuple args, [||])
-  | Cop(Ccmpa cmp, [arg1; Cconst_int (n, _)], _)
-    when self#is_immediate_test (Iunsigned cmp) n ->
-      (Iinttest(Iunsigned cmp), arg1, [|Ireg 0; Iimm n;|])
-  | Cop(Ccmpa cmp, [Cconst_int (n, _); arg2], _)
-    when self#is_immediate_test (Iunsigned (swap_integer_comparison cmp)) n ->
-      (Iinttest(Iunsigned(swap_integer_comparison cmp)), arg2, [|Ireg 0; Iimm n;|])
+      hack (Iintop (Icomp (Isigned cmp))) args
   | Cop(Ccmpa cmp, args, _) ->
-      (Iinttest(Iunsigned cmp), Ctuple args, [||])
+      hack (Iintop (Icomp (Iunsigned cmp))) args
   | Cop(Ccmpf cmp, args, _) ->
-      (Ifloattest cmp, Ctuple args, [||])
+      hack (Ifloatop (Icompf cmp)) args
   | Cop(Cand, [arg; Cconst_int (1, _)], _) ->
       (Ioddtest, arg, [||])
   | arg ->
