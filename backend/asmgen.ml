@@ -192,7 +192,7 @@ let compile_fundecl ~ppf_dump fd_cmm =
   Reg.reset();
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
-  ++ Profile.record ~accumulate:true "selection" Selection.fundecl
+  ++ Profile.record ~accumulate:true "selection" (Selection.fundecl ~ppf_dump)
   ++ pass_dump_if ppf_dump dump_selection "After instruction selection"
   ++ Profile.record ~accumulate:true "comballoc" Comballoc.fundecl
   ++ pass_dump_if ppf_dump dump_combine "After allocation combining"

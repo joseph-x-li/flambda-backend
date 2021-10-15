@@ -383,4 +383,4 @@ method! insert_op_debug env op dbg rs rd operands =
 
 end
 
-let fundecl f = (new selector)#emit_fundecl f
+let fundecl f ~ppf_dump = (new selector)#emit_fundecl f ~ppf_dump

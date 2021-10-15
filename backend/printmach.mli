@@ -32,3 +32,7 @@ val phase: string -> formatter -> Mach.fundecl -> unit
 val interferences: formatter -> unit -> unit
 val intervals: formatter -> unit -> unit
 val preferences: formatter -> unit -> unit
+val intop: Mach.integer_operation -> string
+val floatop: Mach.float_operation -> string
+val intcomp: Mach.integer_comparison -> string
+val floatcomp: Mach.float_comparison -> string
