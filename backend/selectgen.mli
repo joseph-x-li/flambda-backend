@@ -84,6 +84,13 @@ class virtual selector_generic : object
     Debuginfo.t ->
     Mach.operation * Cmm.expression list * Mach.operand array
     (* Can be overridden to deal with special arithmetic instructions *)
+  method select_operands :
+    Mach.operation ->
+    Cmm.expression list ->
+    commutative:bool ->
+    chunk:Cmm.memory_chunk ->
+    Mach.operation * Cmm.expression list * Mach.operand array
+    (* Can be overridden to deal with special operands *)
   method select_condition :
     Cmm.expression ->
     Mach.test * Cmm.expression * Mach.operand array

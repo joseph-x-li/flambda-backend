@@ -204,7 +204,7 @@ method! reload_operation op arg res operands =
                | Istore_int (_, _, _)
                | Ioffset_loc (_, _)
                | Iprefetch _
-               | Ibswap _| Ifloatsqrtf _)
+               | Ibswap _)
   | Imove|Ispill|Ireload|Ifloatop(Inegf|Iabsf|Icompf _)
   | Iconst_float _|Icall_ind|Icall_imm _
   | Itailcall_ind|Itailcall_imm _|Iextcall _|Istackoffset _|Iload (_, _)

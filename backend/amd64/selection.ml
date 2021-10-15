@@ -162,7 +162,7 @@ let pseudoregs_for_operation op arg res operands =
   | Iintop (Ipopcnt|Iclz _|Ictz _|Icomp _|Icheckbound)
   | Ispecific (Isqrtf|Isextend32|Izextend32|Ilea _|Istore_int (_, _, _)
               |Ifloat_iround|Ifloat_round _
-              |Ioffset_loc (_, _)|Ifloatsqrtf _|Irdtsc|Iprefetch _)
+              |Ioffset_loc (_, _)|Irdtsc|Iprefetch _)
   | Imove|Ispill|Ireload|Ifloatofint|Iintoffloat|Iconst_int _|Iconst_float _
   | Iconst_symbol _|Icall_ind|Icall_imm _|Itailcall_ind|Itailcall_imm _
   | Iextcall _|Istackoffset _|Iload (_, _)|Istore (_, _, _)|Ialloc _
@@ -210,6 +210,7 @@ method is_immediate_test _cmp n = is_immediate n
 
 method! memory_operands_supported = function
   | Ifloatop (Iaddf | Isubf | Imulf |Idivf) -> true
+  | Ispecific Isqrtf -> true
   | op -> super#memory_operands_supported op
 
 method! is_simple_expr e =
@@ -273,15 +274,8 @@ method! select_operation op args dbg =
       end
   (* Recognize float arithmetic with memory. *)
   | Cextcall { func = "sqrt"; alloc = false; } ->
-     begin match args with
-       [Cop(Cload ((Double as chunk), _), [loc], _dbg)] ->
-         let (addr, arg, _) = self#select_addressing chunk loc in
-         (Ispecific(Ifloatsqrtf addr), [arg], [||])
-     | [arg] ->
-         (Ispecific Isqrtf, [arg], [||])
-     | _ ->
-         assert false
-    end
+      super#select_operands (Ispecific Isqrtf) args
+        ~commutative:false ~chunk:Double
   | Cextcall { func = "caml_int64_bits_of_float_unboxed"; alloc = false;
                ty = [|Int|]; ty_args = [XFloat] }
   | Cextcall { func = "caml_int64_float_of_bits_unboxed"; alloc = false;

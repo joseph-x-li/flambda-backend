@@ -32,7 +32,6 @@ method! class_of_operation op operands =
     | Ilea _ | Isextend32 | Izextend32 -> Op_pure
     | Istore_int(_, _, is_asg) -> Op_store is_asg
     | Ioffset_loc(_, _) -> Op_store true
-    | Ifloatsqrtf _ -> Op_load
     | Ibswap _ | Isqrtf -> super#class_of_operation op operands
     | Irdtsc | Irdpmc -> Op_other
     | Ifloat_iround | Ifloat_min | Ifloat_max | Ifloat_round _

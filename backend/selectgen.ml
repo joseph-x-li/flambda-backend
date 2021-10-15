@@ -627,23 +627,28 @@ method private select_arith_comp cmp = function
    and for swapping args. *)
 method memory_operands_supported op = false
 
-method private select_operands op args ~commutative ~chunk =
+method select_operands op args ~commutative ~chunk =
   match args with
+  | [Cop(Cload (c, _), [loc], _dbg)]
+    when self#memory_operands_supported op
+      && equal_memory_chunk chunk c ->
+    let (addr, arg, len) = self#select_addressing chunk loc in
+    (op, [arg], [| mem_operand addr ~index:0 ~len |])
   | [arg1; Cop(Cload (c, _), [loc2], _)]
        when self#memory_operands_supported op
             && equal_memory_chunk chunk c ->
-     let (addr, arg2, n) = self#select_addressing chunk loc2 in
+     let (addr, arg2, len) = self#select_addressing chunk loc2 in
      op,
      [arg1; arg2],
-     [| Ireg 0; mem_operand addr ~index:1 ~len:n |]
+     [| Ireg 0; mem_operand addr ~index:1 ~len |]
   | [Cop(Cload (c, _), [loc1], _); arg2]
        when commutative
             && self#memory_operands_supported op
             && equal_memory_chunk chunk c ->
-      let (addr, arg1, n) = self#select_addressing chunk loc1 in
+      let (addr, arg1, len) = self#select_addressing chunk loc1 in
       op,
       [arg2; arg1],
-      [| Ireg 0; mem_operand addr ~index:1 ~len:n |]
+      [| Ireg 0; mem_operand addr ~index:1 ~len |]
   | _ -> op, args, [||]
 
 method private select_floatarith op args ~commutative =

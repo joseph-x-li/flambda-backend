@@ -82,7 +82,6 @@ type specific_operation =
   | Ioffset_loc of int * addressing_mode (* Add a constant to a location *)
   | Ibswap of int                      (* endianness conversion *)
   | Isqrtf                             (* Float square root *)
-  | Ifloatsqrtf of addressing_mode     (* Float square root from memory *)
   | Ifloat_iround                      (* Rounds a [float] to an [int64]
                                           using the current rounding mode *)
   | Ifloat_round of rounding_mode      (* Round [float] to an integer [float]
@@ -189,9 +188,6 @@ let print_specific_operation printreg op ppf arg =
        printreg arg.(0)
   | Ifloat_min -> fprintf ppf "float_min %a %a" printreg arg.(0) printreg arg.(1)
   | Ifloat_max -> fprintf ppf "float_max %a %a" printreg arg.(0) printreg arg.(1)
-  | Ifloatsqrtf addr ->
-     fprintf ppf "sqrtf float64[%a]"
-             (print_addressing printreg addr) [|arg.(0)|]
   | Ibswap i ->
       fprintf ppf "bswap_%i %a" i printreg arg.(0)
   | Isextend32 ->
@@ -284,8 +280,6 @@ let equal_specific_operation left right =
     Int.equal left right
   | Isqrtf, Isqrtf ->
     true
-  | Ifloatsqrtf left, Ifloatsqrtf right ->
-    equal_addressing_mode left right
   | Isextend32, Isextend32 ->
     true
   | Izextend32, Izextend32 ->
@@ -306,7 +300,7 @@ let equal_specific_operation left right =
     && equal_prefetch_temporal_locality_hint left_locality right_locality
     && equal_addressing_mode left_addr right_addr
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ibswap _
-    | Isqrtf | Ifloatsqrtf _ | Isextend32 | Izextend32 | Irdtsc | Irdpmc
+    | Isqrtf | Isextend32 | Izextend32 | Irdtsc | Irdpmc
     | Ifloat_iround | Ifloat_round _ | Ifloat_min | Ifloat_max
     | Icrc32q | Iprefetch _), _ ->
     false
