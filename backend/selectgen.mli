@@ -63,7 +63,7 @@ end
 class virtual selector_generic : object
   (* The following methods must or can be overridden by the processor
      description *)
-  method is_immediate : Mach.integer_operation -> int -> bool
+  method is_immediate : Mach.operation -> int -> bool
     (* Must be overriden to indicate whether a constant is a suitable
        immediate operand to the given integer arithmetic instruction.
        The default implementation handles shifts by immediate amounts,
@@ -87,8 +87,6 @@ class virtual selector_generic : object
   method select_operands :
     Mach.operation ->
     Cmm.expression list ->
-    commutative:bool ->
-    chunk:Cmm.memory_chunk ->
     Mach.operation * Cmm.expression list * Mach.operand array
     (* Can be overridden to deal with special operands *)
   method select_condition :
@@ -99,7 +97,7 @@ class virtual selector_generic : object
     bool -> Arch.addressing_mode -> Cmm.expression ->
                                          Mach.operation * Cmm.expression
     (* Can be overridden to deal with special store constant instructions *)
-  method memory_operands_supported : Mach.operation -> bool
+  method memory_operands_supported : Mach.operation -> Cmm.memory_chunk -> bool
     (*  Can be overridden to enable memory operands selection *)
   method regs_for : Cmm.machtype -> Reg.t array
     (* Return an array of fresh registers of the given type.

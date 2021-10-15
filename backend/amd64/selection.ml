@@ -201,17 +201,18 @@ inherit Selectgen.selector_generic as super
 
 method! is_immediate op n =
   match op with
-  | Iadd | Isub | Imul | Iand | Ior | Ixor | Icomp _ | Icheckbound ->
+  | Iintop (Iadd | Isub | Imul | Iand | Ior | Ixor | Icomp _ | Icheckbound) ->
       is_immediate n
   | _ ->
       super#is_immediate op n
 
 method is_immediate_test _cmp n = is_immediate n
 
-method! memory_operands_supported = function
-  | Ifloatop (Iaddf | Isubf | Imulf |Idivf) -> true
-  | Ispecific Isqrtf -> true
-  | op -> super#memory_operands_supported op
+method! memory_operands_supported op chunk =
+  match op, chunk with
+  | Ifloatop (Iaddf | Isubf | Imulf |Idivf), Double -> true
+  | Ispecific Isqrtf, Double -> true
+  | _ -> super#memory_operands_supported op chunk
 
 method! is_simple_expr e =
   match e with
@@ -275,7 +276,6 @@ method! select_operation op args dbg =
   (* Recognize float arithmetic with memory. *)
   | Cextcall { func = "sqrt"; alloc = false; } ->
       super#select_operands (Ispecific Isqrtf) args
-        ~commutative:false ~chunk:Double
   | Cextcall { func = "caml_int64_bits_of_float_unboxed"; alloc = false;
                ty = [|Int|]; ty_args = [XFloat] }
   | Cextcall { func = "caml_int64_float_of_bits_unboxed"; alloc = false;
