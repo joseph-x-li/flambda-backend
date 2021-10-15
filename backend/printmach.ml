@@ -63,8 +63,6 @@ let operand arg ppf = function
       (Arch.print_addressing reg a)
       (Array.sub arg i (Array.length arg - i))
 
-
-
 let operands arg ppf v =
   match Array.length v with
   | 0 -> ()
