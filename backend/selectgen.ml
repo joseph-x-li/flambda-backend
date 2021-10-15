@@ -633,14 +633,14 @@ method select_operands op args ~commutative ~chunk =
     when self#memory_operands_supported op
       && equal_memory_chunk chunk c ->
     let (addr, arg, len) = self#select_addressing chunk loc in
-    (op, [arg], [| mem_operand addr ~index:0 ~len |])
+    (op, [arg], [| mem_operand c addr ~index:0 ~len |])
   | [arg1; Cop(Cload (c, _), [loc2], _)]
        when self#memory_operands_supported op
             && equal_memory_chunk chunk c ->
      let (addr, arg2, len) = self#select_addressing chunk loc2 in
      op,
      [arg1; arg2],
-     [| Ireg 0; mem_operand addr ~index:1 ~len |]
+     [| Ireg 0; mem_operand c addr ~index:1 ~len |]
   | [Cop(Cload (c, _), [loc1], _); arg2]
        when commutative
             && self#memory_operands_supported op
@@ -648,7 +648,7 @@ method select_operands op args ~commutative ~chunk =
       let (addr, arg1, len) = self#select_addressing chunk loc1 in
       op,
       [arg2; arg1],
-      [| Ireg 0; mem_operand addr ~index:1 ~len |]
+      [| Ireg 0; mem_operand c addr ~index:1 ~len |]
   | _ -> op, args, [||]
 
 method private select_floatarith op args ~commutative =

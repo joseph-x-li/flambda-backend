@@ -78,7 +78,7 @@ type operation =
 type operand =
   | Iimm of int
   | Ireg of int
-  | Imem of Arch.addressing_mode * int array
+  | Imem of Cmm.memory_chunk * Arch.addressing_mode * int array
 
 type instruction =
   { desc: instruction_desc;
@@ -193,9 +193,9 @@ let operation_can_raise op =
   | Ialloc _ -> true
   | _ -> false
 
-let mem_operand mode ~index ~len =
+let mem_operand chunk mode ~index ~len =
   let r = Array.init len (fun i -> index + i) in
-  Imem (mode, r)
+  Imem (chunk, mode, r)
 
 let free_conts_for_handlers fundecl =
   let module S = Numbers.Int.Set in
@@ -342,7 +342,8 @@ let equal_operand left right =
   match left, right with
   | Iimm left, Iimm right -> Int.equal left right
   | Ireg left, Ireg right -> Int.equal left right
-  | Imem (addr_left, left), Imem (addr_right, right) ->
+  | Imem (chunk_left, addr_left, left), Imem (chunk_right, addr_right, right) ->
+    Cmm.equal_memory_chunk chunk_left chunk_right &&
     Arch.equal_addressing_mode addr_left addr_right &&
     Array.length left = Array.length right &&
     Array.for_all2 Int.equal left right

@@ -122,7 +122,7 @@ method private one_mem_or_stack arg operands =
      | Iimm _, _ | _, Iimm _ -> arg
      | Ireg _, Ireg _ -> self#one_stack arg
      | Imem _, Imem _ -> assert false
-     | Imem (_,r), Ireg j | Ireg j, Imem (_,r) ->
+     | Imem (_,_,r), Ireg j | Ireg j, Imem (_,_,r) ->
          assert (Array.for_all (fun i -> not (stackp arg.(i))) r);
          if stackp arg.(j) then
            arg.(j) <- self#makereg arg.(j);
@@ -134,7 +134,7 @@ method! reload_operation op arg res operands =
      to be in reg, not on the stack. *)
   Array.iter (function
       | Ireg _ | Iimm _ -> ()
-      | Imem (_, r) ->
+      | Imem (_,_, r) ->
           Array.iter (fun j ->
             if stackp arg.(j) then
               arg.(j) <- self#makereg arg.(j))

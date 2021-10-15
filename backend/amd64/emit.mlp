@@ -272,6 +272,15 @@ let res8 i n = emit_subreg reg_low_8_name BYTE i.res.(n)
 let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
 let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
+
+let data_type : Cmm.memory_chunk -> X86_ast.data_type = function
+  | Word_int | Word_val ->  QWORD
+  | Byte_unsigned | Byte_signed ->  BYTE
+  | Sixteen_unsigned | Sixteen_signed -> WORD
+  | Thirtytwo_unsigned | Thirtytwo_signed -> DWORD
+  | Single -> REAL4
+  | Double -> REAL8
+
 let arg i n =
   match Array.length i.operands with
   | 0 -> reg i.arg.(n)
@@ -279,14 +288,14 @@ let arg i n =
      match i.operands.(n) with
      | Ireg j -> reg i.arg.(j)
      | Iimm c -> int c
-     | Imem (addr, r) ->
+     | Imem (c, addr, r) ->
         if Array.length r = 0 then
           Misc.fatal_error "Emit.arg mem without base reg";
         Array.iter (fun j ->
          if Reg.is_stack i.arg.(j)  then
            Misc.fatal_error ("Emit.arg mem with stack " ^ string_of_int n))
           r;
-        (addressing addr REAL8 i r.(0))
+        (addressing addr (data_type c) i r.(0))
 
 let operand i ~index =
   match Array.length i.operands with

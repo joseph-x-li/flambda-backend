@@ -52,12 +52,14 @@ let regs ppf v =
 let operand arg ppf = function
   | Ireg i -> fprintf ppf "reg %a" reg arg.(i)
   | Iimm i -> fprintf ppf "imm %i" i
-  | Imem (a, [| |]) -> fprintf ppf "mem %a"
-                         (Arch.print_addressing reg a)
-                         [||]
-  | Imem (a, r) ->
+  | Imem (c, a, [| |]) -> fprintf ppf "mem %s[%a]"
+                            (Printcmm.chunk c)
+                            (Arch.print_addressing reg a)
+                            [||]
+  | Imem (c, a, r) ->
     let i = r.(0) in
-    fprintf ppf "mem %a"
+    fprintf ppf "mem %s[%a]"
+      (Printcmm.chunk c)
       (Arch.print_addressing reg a)
       (Array.sub arg i (Array.length arg - i))
 
