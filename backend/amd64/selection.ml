@@ -212,6 +212,11 @@ method! memory_operands_supported op chunk =
   match op, chunk with
   | Ifloatop (Iaddf | Isubf | Imulf |Idivf), Double -> true
   | Ispecific Isqrtf, Double -> true
+  | Iintop _, (Word_int | Word_val) -> true
+  | Ifloatop (Icompf _ ), Double -> (* CR gyorsh: handle Stefan's swaps *) false
+  | Ifloatop (Inegf | Iabsf), _ -> false
+  | Ifloatofint, (Word_int | Word_val) -> true
+  | Iintoffloat, Double -> true
   | _ -> super#memory_operands_supported op chunk
 
 method! is_simple_expr e =
