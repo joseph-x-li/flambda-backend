@@ -44,6 +44,7 @@ open Mach
      Iintop_imm(Iadd, n)/lea    R       R
      Iintop_imm(Icomp _)        R       S
      Iintop_imm(others)         S       S
+     Iintop(Ipopcnt|Iclz|Ictz)  R       S
      Inegf...Idivf              R       R       S
      Ifloatofint                R       S
      Iintoffloat                R       S
@@ -199,7 +200,9 @@ method! reload_operation op arg res operands =
       if !Clflags.pic_code || !Clflags.dlcode || Arch.win64
       then super#reload_operation op arg res operands
       else (arg, res)
-  | Iintop (Ipopcnt | Iclz _| Ictz _)
+  | Iintop (Ipopcnt | Iclz _| Ictz _) ->
+      (* Result must be in register, but argument can be on stack *)
+      (arg, (if stackp res.(0) then [| self#makereg res.(0) |] else res))
   | Ispecific  (Isqrtf | Isextend32 | Izextend32 | Ilea _
                | Istore_int (_, _, _)
                | Ioffset_loc (_, _)
