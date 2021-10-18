@@ -212,43 +212,6 @@ let size_expr (env:environment) exp =
 (* CR gyorsh: temporary - stats about selected operands *)
 let ppf_dump = ref Format.std_formatter
 
-let report ?(swap = false) (op : Mach.operation) operands =
-  let open Format in
-  let print_reg ppf i = fprintf ppf "reg %i" i in
-  let operand ppf = function
-      | Ireg i -> print_reg ppf i
-      | Iimm i -> fprintf ppf "imm %i" i
-      | Imem (c, a, r) ->
-        fprintf ppf "mem %s[%a]"
-          (Printcmm.chunk c)
-          (Arch.print_addressing print_reg a)
-          r
-  in
-  let print_operands ppf v =
-    match Array.length v with
-    | 0 -> ()
-    | 1 -> operand ppf v.(0)
-    | n -> operand ppf v.(0);
-      for i = 1 to n-1 do fprintf ppf ", %a" operand v.(i) done
-  in
-  let print : Mach.operation -> string = function
-    | Iintop op -> (Printmach.intop op)
-    | Ifloatop op -> (Printmach.floatop op)
-    | Ifloatofint -> "floatofint"
-    | Iintoffloat -> "intoffloat"
-    | Imove | Ispill | Ireload | Icall_ind | Itailcall_ind | Iopaque
-    | Iconst_int _ | Iconst_float _ | Iconst_symbol _
-    | Icall_imm _ | Itailcall_imm _ | Iextcall _
-    | Istackoffset _ | Iload (_, _) | Istore (_, _, _) | Ialloc _
-    | Ispecific _| Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ ->
-      assert false
-  in
-  if !Clflags.inlining_report then begin
-    fprintf !ppf_dump "@[<h>Selectgen: %s %a%s@]@\n" (print op)
-      print_operands operands
-      (if swap then " (swapped)" else "")
-  end
-
 (* Swap the two arguments of an integer comparison *)
 
 let swap_intcomp = function
