@@ -217,7 +217,12 @@ method! memory_operands_supported op chunk =
   | Ifloatop (Inegf | Iabsf), _ -> false
   | Ifloatofint, (Word_int | Word_val) -> true
   | Iintoffloat, Double -> true
-  | _ -> super#memory_operands_supported op chunk
+  | (Iintop _ | Ifloatop _ | Ispecific _ | Ifloatofint | Iintoffloat), _ -> false
+  | ((Imove | Ispill | Ireload | Icall_ind | Itailcall_ind | Iopaque
+     | Iconst_int _ | Iconst_float _ | Iconst_symbol _ | Icall_imm _
+     | Itailcall_imm _ |Iextcall _ | Istackoffset _
+     | Iload (_, _) | Istore (_, _, _) | Ialloc _ | Iname_for_debugger _
+     | Iprobe _|Iprobe_is_enabled _), _) -> assert false
 
 method! is_simple_expr e =
   match e with
