@@ -56,6 +56,17 @@ let pass_dump_cfg_if ppf flag message c =
     fprintf ppf "*** %s@.%a@." message (Cfg_with_layout.dump ~msg:"") c;
   c
 
+let count_spills ppf (f : Linear.fundecl) =
+  if !Clflags.inlining_report then begin
+    let spills = ref 0 in
+    let rec iter (i : Linear.instruction) =
+      match i.desc with
+      | Lend -> fprintf ppf "@[<h>Spills: %d (%s)@]@\n" !spills f.fun_name
+      | Lop (Ispill) -> incr spills; iter i.next
+      | _ -> iter i.next
+    in iter f.fun_body
+  end
+
 let start_from_emit = ref true
 
 let should_save_before_emit () =
@@ -211,6 +222,7 @@ let compile_fundecl ~ppf_dump fd_cmm =
   ++ Profile.record ~accumulate:true "available_regs" Available_regs.fundecl
   ++ Profile.record ~accumulate:true "linearize" (fun (f : Mach.fundecl) ->
       let res = Linearize.fundecl f in
+      count_spills ppf_dump res;
       (* CR xclerc for xclerc: temporary, for testing. *)
       if !Clflags.use_ocamlcfg then begin
         test_cfgize f res;
