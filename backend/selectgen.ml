@@ -244,7 +244,7 @@ let report ?(swap = false) (op : Mach.operation) operands =
       assert false
   in
   if !Clflags.inlining_report then begin
-    fprintf !ppf_dump "@[Selectgen: %s %a%s@]" (print op)
+    fprintf !ppf_dump "@[<h>Selectgen: %s %a%s@]@\n" (print op)
       print_operands operands
       (if swap then " (swapped)" else "")
   end
