@@ -171,6 +171,24 @@ let print_addressing printreg addr ppf arg =
       let idx = if n <> 0 then Printf.sprintf " + %i" n else "" in
       fprintf ppf "%a + %a * %i%s" printreg arg.(0) printreg arg.(1) scale idx
 
+let print_specific_operation_name op =
+  match op with
+  | Ilea addr -> "lea"
+  | Istore_int _ -> "store_int"
+  | Ioffset_loc _ -> "offset_loc"
+  | Isqrtf -> "sqrtf"
+  | Ifloat_iround -> "float_iround"
+  | Ifloat_round mode -> "float_round"
+  | Ifloat_min -> "float_min"
+  | Ifloat_max -> "float_max"
+  | Ibswap _ -> "bswap"
+  | Isextend32 -> "sextend32"
+  | Izextend32 -> "zextend32"
+  | Irdtsc -> "rdtsc"
+  | Irdpmc -> "rdpmc"
+  | Icrc32q -> "crc32"
+  | Iprefetch _ -> "prefetch"
+
 let print_specific_operation printreg op ppf arg =
   match op with
   | Ilea addr -> print_addressing printreg addr ppf arg

@@ -236,12 +236,12 @@ let report ?(swap = false) (op : Mach.operation) operands =
     | Ifloatop op -> (Printmach.floatop op)
     | Ifloatofint -> "floatofint"
     | Iintoffloat -> "intoffloat"
+    | Ispecific s -> "specific_"^(Arch.print_specific_operation_name s)
     | Imove | Ispill | Ireload | Icall_ind | Itailcall_ind | Iopaque
     | Iconst_int _ | Iconst_float _ | Iconst_symbol _
     | Icall_imm _ | Itailcall_imm _ | Iextcall _
     | Istackoffset _ | Iload (_, _) | Istore (_, _, _) | Ialloc _
-    | Ispecific _| Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ ->
-      assert false
+    | Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ -> assert false
   in
   if !Clflags.inlining_report then begin
     fprintf !ppf_dump "@[<h>Selectgen: %s %a%s@]@\n" (print op)
