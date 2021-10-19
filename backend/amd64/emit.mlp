@@ -289,13 +289,12 @@ let arg i n =
      | Ireg j -> reg i.arg.(j)
      | Iimm c -> int c
      | Imem (c, addr, r) ->
-        if Array.length r = 0 then
-          Misc.fatal_error "Emit.arg mem without base reg";
         Array.iter (fun j ->
          if Reg.is_stack i.arg.(j)  then
            Misc.fatal_error ("Emit.arg mem with stack " ^ string_of_int n))
-          r;
-        (addressing addr (data_type c) i r.(0))
+         r;
+        let j = if Array.length r = 0 then 0 else r.(0) in
+        (addressing addr (data_type c) i j)
 
 let operand i ~index =
   match Array.length i.operands with
