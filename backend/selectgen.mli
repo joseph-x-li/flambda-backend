@@ -68,7 +68,7 @@ class virtual selector_generic : object
        immediate operand to the given integer arithmetic instruction.
        The default implementation handles shifts by immediate amounts,
        but produces no immediate operations otherwise. *)
-  method virtual is_immediate_test : Mach.integer_comparison -> int -> bool
+  method virtual is_immediate_test : Mach.test -> int -> bool
     (* Must be defined to indicate whether a constant is a suitable
        immediate operand to the given integer test *)
   method virtual select_addressing :
@@ -84,10 +84,23 @@ class virtual selector_generic : object
     Debuginfo.t ->
     Mach.operation * Cmm.expression list * Mach.operand array
     (* Can be overridden to deal with special arithmetic instructions *)
+  method swap_operands : Mach.operation -> Mach.operation option
+    (* Can be overridden to deal with special operands whose
+       arguments can be swapped.
+       Returns [Some new_op] for binary operations whose arguments
+       can be swapped and the corresponding operation to use
+       for swapped arguments. Otherwise, returns [None],
+       in particualr  if the operation is not binary
+       or not commutative.*)
   method select_operands :
     Mach.operation ->
     Cmm.expression list ->
     Mach.operation * Cmm.expression list * Mach.operand array
+    (* Can be overridden to deal with special operands *)
+  method select_operands_condition :
+    Mach.test ->
+    Cmm.expression list ->
+    Mach.test * Cmm.expression * Mach.operand array
     (* Can be overridden to deal with special operands *)
   method select_condition :
     Cmm.expression ->
@@ -98,6 +111,8 @@ class virtual selector_generic : object
                                          Mach.operation * Cmm.expression
     (* Can be overridden to deal with special store constant instructions *)
   method memory_operands_supported : Mach.operation -> Cmm.memory_chunk -> bool
+    (* Can be overridden to enable memory operands selection *)
+  method memory_operands_supported_condition : Mach.test -> Cmm.memory_chunk -> bool
     (*  Can be overridden to enable memory operands selection *)
   method regs_for : Cmm.machtype -> Reg.t array
     (* Return an array of fresh registers of the given type.

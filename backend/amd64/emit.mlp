@@ -461,16 +461,20 @@ let emit_float_test cmp i lbl =
       I.jp lbl;                   (* branch taken if unordered *)
       I.jne lbl                   (* branch taken if x<y or x>y *)
   | CFlt ->
-      I.comisd (arg i 0) (arg i 1);
+      assert (Arch.float_test_need_swap cmp);
+      I.comisd (arg i 1) (arg i 0);
       I.ja lbl                    (* branch taken if y>x i.e. x<y *)
   | CFnlt ->
-      I.comisd (arg i 0) (arg i 1);
+      assert (Arch.float_test_need_swap cmp);
+      I.comisd (arg i 1) (arg i 0);
       I.jbe lbl                   (* taken if unordered or y<=x i.e. !(x<y) *)
   | CFle ->
-      I.comisd (arg i 0) (arg i 1);(* swap compare *)
+      assert (Arch.float_test_need_swap cmp);
+      I.comisd (arg i 1) (arg i 0);(* swap compare *)
       I.jae lbl                    (* branch taken if y>=x i.e. x<=y *)
   | CFnle ->
-      I.comisd (arg i 0) (arg i 1);(* swap compare *)
+      assert (Arch.float_test_need_swap cmp);
+      I.comisd (arg i 1) (arg i 0);(* swap compare *)
       I.jb lbl                     (* taken if unordered or y<x i.e. !(x<=y) *)
   | CFgt ->
       I.comisd (arg i 1) (arg i 0);
@@ -484,8 +488,6 @@ let emit_float_test cmp i lbl =
   | CFnge ->
       I.comisd (arg i 1) (arg i 0);(* swap compare *)
       I.jb lbl                     (* taken if unordered or x<y i.e. !(x>=y) *)
-
-(* Deallocate the stack frame before a return or tail call *)
 
 let output_epilogue f =
   if !frame_required then begin
@@ -887,10 +889,9 @@ let emit_instr fallthrough i =
       assert (same_loc_arg_res0 i ~index:0);
       instr_for_intop op (arg i 1) (res i 0)
   | Lop(Ifloatop(Icompf cmp)) ->
-      let cond, need_swap = float_cond_and_need_swap cmp in
-      let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-      I.cmpsd cond a1 a0;
-      I.movd a0 (res i 0);
+      let cond, _ = Arch.float_compare_and_need_swap cmp in
+      I.cmpsd cond (arg i 1) (arg i 0);
+      I.movd (arg i 0) (res i 0);
       I.neg (res i 0)
   | Lop(Ifloatop Inegf) ->
       I.xorpd (mem64_rip OWORD (emit_symbol "caml_negf_mask")) (res i 0)

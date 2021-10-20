@@ -211,10 +211,10 @@ let size_expr (env:environment) exp =
 
 (* CR gyorsh: temporary - stats about selected operands *)
 let ppf_dump = ref Format.std_formatter
+module Stats = struct
+  open Format
 
-let report ?(swap = false) (op : Mach.operation) operands =
-  let open Format in
-  let print_reg ppf i = fprintf ppf "reg %i" i in
+  let print_reg ppf i = fprintf ppf "reg %i" i
   let operand ppf = function
       | Ireg i -> print_reg ppf i
       | Iimm i -> fprintf ppf "imm %i" i
@@ -223,14 +223,14 @@ let report ?(swap = false) (op : Mach.operation) operands =
           (Printcmm.chunk c)
           (Arch.print_addressing print_reg a)
           r
-  in
+
   let print_operands ppf v =
     match Array.length v with
     | 0 -> ()
     | 1 -> operand ppf v.(0)
     | n -> operand ppf v.(0);
       for i = 1 to n-1 do fprintf ppf ", %a" operand v.(i) done
-  in
+
   let print : Mach.operation -> string = function
     | Iintop op -> (Printmach.intop op)
     | Ifloatop op -> (Printmach.floatop op)
@@ -242,12 +242,29 @@ let report ?(swap = false) (op : Mach.operation) operands =
     | Icall_imm _ | Itailcall_imm _ | Iextcall _
     | Istackoffset _ | Iload (_, _) | Istore (_, _, _) | Ialloc _
     | Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ -> assert false
-  in
-  if !Clflags.inlining_report then begin
-    fprintf !ppf_dump "@[<h>Selectgen: %s %a%s@]@\n" (print op)
-      print_operands operands
-      (if swap then " (swapped)" else "")
-  end
+
+  let report ?(swap = false) (op : Mach.operation) operands =
+    if !Clflags.inlining_report then begin
+      fprintf !ppf_dump "@[<h>Selectgen: %s %a%s@]@\n" (print op)
+        print_operands operands
+        (if swap then " (swapped)" else "")
+    end
+
+  let print_test : Mach.test -> string = function
+    | Itruetest -> "Itruetest"
+    | Ifalsetest ->  "Ifalsetest"
+    | Iinttest cmp -> "Iinttest "^Printmach.intcomp cmp
+    | Ifloattest cmp -> "Ifloattest "^Printmach.floatcomp cmp
+    | Ieventest -> "Ieventest"
+    | Ioddtest -> "Ioddtest"
+
+  let report_test  ?(swap = false) (op : Mach.test) operands =
+    if !Clflags.inlining_report then begin
+      fprintf !ppf_dump "@[<h>Selectgen: %s %a%s@]@\n" (print_test op)
+        print_operands operands
+        (if swap then " (swapped)" else "")
+    end
+end
 
 (* Swap the two arguments of an integer comparison *)
 
@@ -530,7 +547,7 @@ method is_immediate op n =
 (* Says whether an integer constant is a suitable immediate argument for
    the given integer test *)
 
-method virtual is_immediate_test : integer_comparison -> int -> bool
+method virtual is_immediate_test : Mach.test -> int -> bool
 
 (* Selection of addressing modes *)
 
@@ -645,7 +662,7 @@ method select_operation op args _dbg =
 (* CR gyorsh: we might need more information on which arg can be in memory,
    and for swapping args. *)
 method memory_operands_supported _op _c = false
-
+method memory_operands_supported_condition _op _c = false
 (* method private select_operand arg =
  *   match arg with
  *   | Cconst_int (n, _) -> (arg, Iimm n)
@@ -654,8 +671,7 @@ method memory_operands_supported _op _c = false
  *     (arg, mem_operand chunk addr ~index:0 ~len)
  *   | _ -> (arg, Ireg 0) *)
 
-method select_operands op args =
-  let swap =
+method swap_operands op =
     match op with
     | Iintop (Icomp cmp) -> Some(Iintop(Icomp (swap_intcomp cmp)))
     | Iintop (Iadd | Imul | Imulh _ | Iand | Ior |Ixor) -> Some op
@@ -670,7 +686,9 @@ method select_operands op args =
     | Icall_imm _ | Itailcall_imm _ | Iextcall _
     | Istackoffset _ | Iload (_, _) | Istore (_, _, _) | Ialloc _
     | Ispecific _| Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ -> None
-  in
+
+method select_operands op args =
+  let swap = self#swap_operands op in
   let commutative = Option.is_some swap in
   (* CR gyorsh: sensitive to order of cases *)
   match args with
@@ -678,26 +696,26 @@ method select_operands op args =
   | [arg; Cconst_int (n, _)]
     when self#is_immediate op n ->
     let operands = [|Ireg 0; Iimm n|] in
-    report op operands;
+    Stats.report op operands;
     (op, [arg], operands)
   | [Cconst_int (n, _); arg]
     when commutative
       && self#is_immediate (Option.get swap) n ->
     let operands = [|Ireg 0; Iimm n|] in
-    report op operands ~swap:true;
+    Stats.report op operands ~swap:true;
     ((Option.get swap), [arg], operands)
   (* Memory operands *)
   | [Cop(Cload (c, _), [loc], _dbg)]
     when self#memory_operands_supported op c ->
     let (addr, arg, len) = self#select_addressing c loc in
     let operands = [| mem_operand c addr ~index:0 ~len |] in
-    report op operands;
+    Stats.report op operands;
     (op, [arg], operands)
   | [arg1; Cop(Cload (c, _), [loc2], _)]
     when self#memory_operands_supported op c ->
     let (addr, arg2, len) = self#select_addressing c loc2 in
     let operands = [| Ireg 0; mem_operand c addr ~index:1 ~len |] in
-    report op operands;
+    Stats.report op operands;
     op,
     [arg1; arg2],
     operands
@@ -706,7 +724,7 @@ method select_operands op args =
       && self#memory_operands_supported (Option.get swap) c ->
     let (addr, arg1, len) = self#select_addressing c loc1 in
     let operands = [| Ireg 0; mem_operand c addr ~index:1 ~len |] in
-    report op operands ~swap:true;
+    Stats.report op operands ~swap:true;
     (Option.get swap),
     [arg2; arg1],
     operands
@@ -714,27 +732,68 @@ method select_operands op args =
 
 (* Instruction selection for conditionals *)
 
+method private swap_operands_condition: Mach.test -> Mach.test option = function
+  | Iinttest cmp -> Some (Iinttest (swap_intcomp cmp))
+  | Ifloattest cmp -> None
+  | Ioddtest | Ieventest | Itruetest | Ifalsetest -> None
+
+method select_operands_condition op args =
+  let swap = self#swap_operands_condition op in
+  let commutative = Option.is_some swap in
+  (* CR gyorsh: sensitive to order of cases *)
+  match args with
+  (* Immediate operands *)
+  | [arg; Cconst_int (n, _)]
+    when self#is_immediate_test op n ->
+    let operands = [|Ireg 0; Iimm n|] in
+    Stats.report_test op operands;
+    (op, arg, operands)
+  | [Cconst_int (n, _); arg]
+    when commutative
+      && self#is_immediate_test (Option.get swap) n ->
+    let operands = [|Ireg 0; Iimm n|] in
+    Stats.report_test op operands ~swap:true;
+    ((Option.get swap), arg, operands)
+  (* Memory operands *)
+  | [Cop(Cload (c, _), [loc], _dbg)]
+    when self#memory_operands_supported_condition op c ->
+    let (addr, arg, len) = self#select_addressing c loc in
+    let operands = [| mem_operand c addr ~index:0 ~len |] in
+    Stats.report_test op operands;
+    (op, arg, operands)
+  | [arg1; Cop(Cload (c, _), [loc2], _)]
+    when self#memory_operands_supported_condition op c ->
+    let (addr, arg2, len) = self#select_addressing c loc2 in
+    let operands = [| Ireg 0; mem_operand c addr ~index:1 ~len |] in
+    Stats.report_test op operands;
+    op,
+    Ctuple [arg1; arg2],
+    operands
+  | [Cop(Cload (c, _), [loc1], _); arg2]
+    when commutative
+      && self#memory_operands_supported_condition (Option.get swap) c ->
+    let (addr, arg1, len) = self#select_addressing c loc1 in
+    let operands = [| Ireg 0; mem_operand c addr ~index:1 ~len |] in
+    Stats.report_test op operands ~swap:true;
+    (Option.get swap),
+    Ctuple [arg2; arg1],
+    operands
+  | _ -> op, Ctuple args, [||]
 
 method select_condition cond =
-  (* CR gyorsh: fix this after operands and args are refactored into one *)
-  let hack tmp_op args =
-    let new_op, new_args, new_operands = self#select_operands tmp_op args in
-    match new_op with
-    | Iintop (Icomp new_cmp) -> Iinttest new_cmp, Ctuple new_args, new_operands
-    | Ifloatop (Icompf new_cmp) -> Ifloattest new_cmp, Ctuple new_args, new_operands
-    | _ -> assert false
-  in
+  (* CR gyorsh: fix this after operands and args are refactored into one,
+  select_operands and select_test are duplicates *)
   match cond with
   | Cop(Ccmpi cmp, args, _) ->
-      hack (Iintop (Icomp (Isigned cmp))) args
+      self#select_operands_condition (Iinttest (Isigned cmp)) args
   | Cop(Ccmpa cmp, args, _) ->
-      hack (Iintop (Icomp (Iunsigned cmp))) args
+      self#select_operands_condition (Iinttest (Iunsigned cmp)) args
   | Cop(Ccmpf cmp, args, _) ->
-      hack (Ifloatop (Icompf cmp)) args
+      self#select_operands_condition (Ifloattest cmp) args
   | Cop(Cand, [arg; Cconst_int (1, _)], _) ->
-      (Ioddtest, arg, [||])
+      self#select_operands_condition Ioddtest [arg]
   | arg ->
-      (Itruetest, arg, [||])
+      self#select_operands_condition Itruetest [arg]
 
 (* Return an array of fresh registers of the given type.
    Normally implemented as Reg.createv, but some

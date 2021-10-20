@@ -137,7 +137,6 @@ let pseudoregs_for_operation op arg res operands =
   | Iintop(Imod) ->
       ([| rax; rcx |], [| rdx |])
   | Ifloatop(Icompf cond) ->
-    (* CR gyorsh: make this optimization as a separate PR. *)
       (* We need to temporarily store the result of the comparison in a
          float register, but we don't want to clobber any of the inputs
          if they would still be live after this operation -- so we
@@ -145,10 +144,13 @@ let pseudoregs_for_operation op arg res operands =
          [destroyed_at_oper], because that forces us to choose a fixed
          register, which makes it more likely an extra mov would be added
          to transfer the argument to the fixed register. *)
+      (* Icompf is emitted as the sequence:
+         cmpsd treg a; movd treg res.(0); neg res.(0) *)
+      (* For cmpsd instruction, the result must be in register
+         and the first argument must be in the same register.
+         Second argument can in register or stack or memory. *)
       let treg = Reg.create Float in
-      let _,is_swapped = float_cond_and_need_swap cond in
-      (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |])
-    , [| res.(0); treg |]
+      [| treg; arg.(1) |], [| res.(0); treg |]
   | Ispecific Irdpmc ->
   (* For rdpmc instruction, the argument must be in ecx
      and the result is in edx (high) and eax (low).
@@ -213,16 +215,31 @@ method! memory_operands_supported op chunk =
   | Ifloatop (Iaddf | Isubf | Imulf |Idivf), Double -> true
   | Ispecific Isqrtf, Double -> true
   | Iintop _, (Word_int | Word_val) -> true
-  | Ifloatop (Icompf _ ), Double -> (* CR gyorsh: handle Stefan's swaps *) false
+  | Iintop _, _ ->
+    (* The value loaded from memory needs to be extended before use in Iintop  *)
+    false
+  | Ifloatop (Icompf _ ), Double -> true
   | Ifloatop (Inegf | Iabsf), _ -> false
   | Ifloatofint, (Word_int | Word_val) -> true
   | Iintoffloat, Double -> true
-  | (Iintop _ | Ifloatop _ | Ispecific _ | Ifloatofint | Iintoffloat), _ -> false
+  | (Ifloatop _ | Ispecific _ | Ifloatofint | Iintoffloat), _ -> false
   | ((Imove | Ispill | Ireload | Icall_ind | Itailcall_ind | Iopaque
      | Iconst_int _ | Iconst_float _ | Iconst_symbol _ | Icall_imm _
      | Itailcall_imm _ |Iextcall _ | Istackoffset _
      | Iload (_, _) | Istore (_, _, _) | Ialloc _ | Iname_for_debugger _
      | Iprobe _|Iprobe_is_enabled _), _) -> assert false
+
+method! memory_operands_supported_condition (op : Mach.test) chunk =
+  match op, chunk with
+  | (Iinttest (Isigned _ | Iunsigned _)
+    | Ioddtest | Ieventest | Itruetest | Ifalsetest),
+    (Word_int | Word_val) -> true
+  | (Iinttest (Isigned _ | Iunsigned _)
+    | Ioddtest | Ieventest | Itruetest | Ifalsetest),_ ->
+    Misc.fatal_errorf "memory_operands_condition inttest with chunk=%s"
+      (Printcmm.chunk chunk) ()
+  | (Ifloattest cmp, Double) -> true
+  | Ifloattest cmp, _ -> false
 
 method! is_simple_expr e =
   match e with
@@ -272,6 +289,14 @@ method! select_store is_assign addr exp =
   | Cexit (_, _, _) | Ctrywith (_, _, _, _, _)
     ->
       super#select_store is_assign addr exp
+
+method select_condition cond =
+  match cond with
+  | Cop(Ccmpf cmp, ([arg0;arg1] as args), _) ->
+     self#select_operands_condition (Ifloattest cmp)
+       (if Arch.float_test_need_swap cmp then [arg1;arg0] else args)
+  | arg ->
+      super#select_condition cond
 
 method! select_operation op args dbg =
   match op with
@@ -368,6 +393,17 @@ method! select_operation op args dbg =
         self#select_addressing Word_int (one_arg "prefetch" args)
       in
       Ispecific (Iprefetch { is_write; addr; locality; }), [eloc], [||]
+  | Ccmpf comp ->
+      let _,need_swap = Arch.float_compare_and_need_swap comp in
+      let args =
+        if need_swap then
+          match args with
+          | [arg0; arg1] -> [arg1;arg0]
+          | _ -> assert false
+        else
+          args
+      in
+      self#select_operands (Ifloatop (Icompf comp)) args
   | _ -> super#select_operation op args dbg
 
 
