@@ -70,17 +70,6 @@ let stackp r =
     Stack _ -> true
   | Reg _ | Unknown -> false
 
-let is_stack arg operands ~index =
-  if Array.length operands > index then
-    match operands.(index) with
-    | Iimm _ -> false
-    | Ireg j -> stackp arg.(j)
-    | Imem _ -> assert false
-  else begin
-      assert (Array.length arg > index);
-      stackp arg.(index)
-    end
-
 let imm operands ~index =
   if Array.length operands > index then
     match operands.(index) with
@@ -96,6 +85,17 @@ let is_immediate operands ~index =
     | Ireg _ | Imem _ -> false
   else
     false
+
+let is_stack arg operands ~index =
+  if Array.length operands > index then
+    match operands.(index) with
+    | Iimm _ -> false
+    | Ireg j -> stackp arg.(j)
+    | Imem _ -> assert false
+  else begin
+      assert (Array.length arg > index);
+      stackp arg.(index)
+    end
 
 let same_loc_arg0_res0 arg res operands =
   if Array.length operands > 0 then
@@ -131,11 +131,11 @@ method private one_mem_or_stack arg operands =
 (* First argument (= result) must be in register, second arg
          can reside in the stack or memory or immediate *)
 method private same_reg_res0_arg0 arg res operands =
-  if is_stack arg operands
+  if is_stack arg operands ~index:0
   then begin
     let r = self#makereg arg.(0) in
     arg.(0) <- r;
-    (arg, [|r|]))
+    (arg, [|r|])
   end else (arg, res)
 
 method! reload_operation op arg res operands =
