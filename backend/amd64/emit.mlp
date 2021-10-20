@@ -230,9 +230,17 @@ let reg_low_8_name  = Array.map (fun r -> Reg8L r) int_reg_name
 let reg_low_16_name = Array.map (fun r -> Reg16 r) int_reg_name
 let reg_low_32_name = Array.map (fun r -> Reg32 r) int_reg_name
 
-let emit_subreg tbl typ r =
+let emit_subreg typ r =
   match r.loc with
-  | Reg.Reg r when r < 13 -> tbl.(r)
+  | Reg.Reg r when r < 13 ->
+    let tbl =
+      match typ with
+      | BYTE -> reg_low_8_name
+      | WORD -> reg_low_16_name
+      | DWORD -> reg_low_32_name
+      | _ -> assert false
+    in
+    tbl.(r)
   | Stack s -> mem64 typ (slot_offset s (register_class r)) RSP
   | _ -> assert false
 
@@ -263,15 +271,14 @@ let addressing addr typ i n =
   | Iindexed2scaled(scale, d) ->
       mem64 typ ~scale ~base:(arg64 i n) d (arg64 i (n+1))
 
-let arg8 i n = emit_subreg reg_low_8_name BYTE (arg_reg i n)
-let arg16 i n = emit_subreg reg_low_16_name WORD (arg_reg i n)
-let arg32 i n = emit_subreg reg_low_32_name DWORD (arg_reg i n)
+let arg8 i n = emit_subreg BYTE (arg_reg i n)
+let arg16 i n = emit_subreg WORD (arg_reg i n)
+let arg32 i n = emit_subreg DWORD (arg_reg i n)
 let arg64 i n = reg64 (arg_reg i n)
 
-let res8 i n = emit_subreg reg_low_8_name BYTE i.res.(n)
-let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
-let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
-
+let res8 i n = emit_subreg BYTE i.res.(n)
+let res16 i n = emit_subreg WORD i.res.(n)
+let res32 i n = emit_subreg DWORD i.res.(n)
 
 let data_type : Cmm.memory_chunk -> X86_ast.data_type = function
   | Word_int | Word_val ->  QWORD
@@ -281,12 +288,12 @@ let data_type : Cmm.memory_chunk -> X86_ast.data_type = function
   | Single -> REAL4
   | Double -> REAL8
 
-let arg i n =
+let arg ?(emit_reg=reg) i n =
   match Array.length i.operands with
-  | 0 -> reg i.arg.(n)
+  | 0 -> emit_reg i.arg.(n)
   | _ ->
      match i.operands.(n) with
-     | Ireg j -> reg i.arg.(j)
+     | Ireg j -> emit_reg i.arg.(j)
      | Iimm c -> int c
      | Imem (c, addr, r) ->
         Array.iter (fun j ->
@@ -1079,10 +1086,10 @@ let emit_instr fallthrough i =
       | Ifloattest cmp ->
           emit_float_test cmp i lbl
       | Ioddtest ->
-          I.test (int 1) (arg8 i 0);
+          I.test (int 1) (arg ~emit_reg:(emit_subreg BYTE) i 0);
           I.jne lbl
       | Ieventest ->
-          I.test (int 1) (arg8 i 0);
+          I.test (int 1) (arg ~emit_reg:(emit_subreg BYTE) i 0);
           I.je lbl
       end
   | Lcondbranch3(lbl0, lbl1, lbl2) ->
