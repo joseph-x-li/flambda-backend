@@ -218,6 +218,7 @@ module Stats = struct
   let operand ppf = function
       | Ireg i -> print_reg ppf i
       | Iimm i -> fprintf ppf "imm %i" i
+      | Iimmf f -> fprintf ppf "immf %f" (Int64.float_of_bits f)
       | Imem (c, a, r) ->
         fprintf ppf "mem %s[%a]"
           (Printcmm.chunk c)
@@ -663,9 +664,11 @@ method select_operation op args _dbg =
    and for swapping args. *)
 method memory_operands_supported _op _c = false
 method memory_operands_supported_condition _op _c = false
+method is_immediate_float _op _f = false
+method is_immediate_test_float _op _f = false
 (* method private select_operand arg =
  *   match arg with
- *   | Cconst_int (n, _) -> (arg, Iimm n)
+ *   | Cconst_int (n, _) -> Iimm n
  *   | Cop(Cload (chunk, _), [loc], _dbg) ->
  *     let (addr, arg, len) = self#select_addressing chunk loc in
  *     (arg, mem_operand chunk addr ~index:0 ~len)
@@ -692,7 +695,7 @@ method select_operands op args =
   let commutative = Option.is_some swap in
   (* CR gyorsh: sensitive to order of cases *)
   match args with
-  (* Immediate operands *)
+  (* Immediate operands of integer operations *)
   | [arg; Cconst_int (n, _)]
     when self#is_immediate op n ->
     let operands = [|Ireg 0; Iimm n|] in
@@ -702,6 +705,20 @@ method select_operands op args =
     when commutative
       && self#is_immediate (Option.get swap) n ->
     let operands = [|Ireg 0; Iimm n|] in
+    Stats.report op operands ~swap:true;
+    ((Option.get swap), [arg], operands)
+  (* Immediate operands of float operations *)
+  | [arg; Cconst_float(f, _)]
+    when self#is_immediate_float op f ->
+    let n = Int64.bits_of_float f in
+    let operands = [|Ireg 0; Iimmf n|] in
+    Stats.report op operands;
+    (op, [arg], operands)
+  | [Cconst_float(f, _); arg]
+    when commutative
+      && self#is_immediate_float (Option.get swap) f->
+    let n = Int64.bits_of_float f in
+    let operands = [|Ireg 0; Iimmf n|] in
     Stats.report op operands ~swap:true;
     ((Option.get swap), [arg], operands)
   (* Memory operands *)
@@ -742,7 +759,7 @@ method select_operands_condition op args =
   let commutative = Option.is_some swap in
   (* CR gyorsh: sensitive to order of cases *)
   match args with
-  (* Immediate operands *)
+  (* Immediate operands of integer operations *)
   | [arg; Cconst_int (n, _)]
     when self#is_immediate_test op n ->
     let operands = [|Ireg 0; Iimm n|] in
@@ -752,6 +769,20 @@ method select_operands_condition op args =
     when commutative
       && self#is_immediate_test (Option.get swap) n ->
     let operands = [|Ireg 0; Iimm n|] in
+    Stats.report_test op operands ~swap:true;
+    ((Option.get swap), arg, operands)
+  (* Immediate operands of float operations *)
+  | [arg; Cconst_float (f, _)]
+    when self#is_immediate_test_float op f ->
+    let n = Int64.bits_of_float f in
+    let operands = [|Ireg 0; Iimmf n|] in
+    Stats.report_test op operands;
+    (op, arg, operands)
+  | [Cconst_float (f, _); arg]
+    when commutative
+      && self#is_immediate_test_float (Option.get swap) f ->
+    let n = Int64.bits_of_float f in
+    let operands = [|Ireg 0; Iimmf n|] in
     Stats.report_test op operands ~swap:true;
     ((Option.get swap), arg, operands)
   (* Memory operands *)

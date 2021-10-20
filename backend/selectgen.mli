@@ -64,13 +64,19 @@ class virtual selector_generic : object
   (* The following methods must or can be overridden by the processor
      description *)
   method is_immediate : Mach.operation -> int -> bool
-    (* Must be overriden to indicate whether a constant is a suitable
-       immediate operand to the given integer arithmetic instruction.
+    (* Must be overriden to indicate whether an integer constant
+       is a suitable immediate operand to the given arithmetic instruction.
        The default implementation handles shifts by immediate amounts,
        but produces no immediate operations otherwise. *)
+  method is_immediate_float : Mach.operation -> float -> bool
+    (* Can be overriden to indicate whether a float constant is a suitable
+       immediate operand to the given arithmetic instruction. *)
   method virtual is_immediate_test : Mach.test -> int -> bool
-    (* Must be defined to indicate whether a constant is a suitable
-       immediate operand to the given integer test *)
+    (* Must be defined to indicate whether an integer constant is a suitable
+       immediate operand to the given test *)
+  method is_immediate_test_float : Mach.test -> float -> bool
+    (* Can be be defined to indicate whether a float constant is a suitable
+       immediate operand to the given test *)
   method virtual select_addressing :
     Cmm.memory_chunk -> Cmm.expression ->
     Arch.addressing_mode * Cmm.expression * int

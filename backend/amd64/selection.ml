@@ -94,14 +94,6 @@ let same_reg_res0_arg0 arg res =
   arg'.(0) <- res.(0);
   (arg', res)
 
-let is_immediate operands ~index =
-  if Array.length operands > index then
-    match operands.(index) with
-    | Iimm _ -> true
-    | Ireg _ | Imem _ -> false
-  else
-    false
-
 let pseudoregs_for_operation op arg res operands =
   match op with
   (* arg.(0) and res.(0) must be the same *)
@@ -124,7 +116,16 @@ let pseudoregs_for_operation op arg res operands =
       ([| rax; arg.(1) |], [| rdx |])
   | Iintop(Ilsl|Ilsr|Iasr) ->
      (* arg.(0) and res.(0) must be the same *)
-     if is_immediate operands ~index:1 then
+     let is_immediate_arg operands ~index =
+       if Array.length operands > index then
+         match operands.(index) with
+         | Iimm _ -> true
+         | Iimmf _ -> assert false
+         | Ireg _ | Imem _ -> false
+       else
+         false
+     in
+     if is_immediate_arg operands ~index:1 then
        same_reg_res0_arg0 arg res
      else
        (* For shifts with variable shift count, second arg must be in rcx *)
@@ -208,7 +209,17 @@ method! is_immediate op n =
   | _ ->
       super#is_immediate op n
 
+method! is_immediate_float op f =
+  match op with
+  | Ifloatop (Iaddf | Isubf | Imulf | Idivf) -> f <> +0.0
+  | _ -> false
+
 method is_immediate_test _cmp n = is_immediate n
+
+method is_immediate_test_float cmp f =
+  match cmp with
+  | Ifloattest _ -> f <> +0.0
+  | _ -> false
 
 method! memory_operands_supported op chunk =
   match op, chunk with

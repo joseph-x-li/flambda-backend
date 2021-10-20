@@ -396,7 +396,9 @@ let imm : 'a Cfg.instruction -> index:int -> int option =
   match Array.length i.operands with
   | 0 -> None
   | _ -> (
-    match i.operands.(index) with Iimm n -> Some n | Ireg _ | Imem _ -> None)
+    match i.operands.(index) with
+    | Iimm n -> Some n
+    | Iimmf _ | Ireg _ | Imem _ -> None)
 
 let special_immediates expected result =
   match imm expected ~index:1, imm result ~index:1 with

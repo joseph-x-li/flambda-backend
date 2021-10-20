@@ -70,18 +70,11 @@ let stackp r =
     Stack _ -> true
   | Reg _ | Unknown -> false
 
-let imm operands ~index =
-  if Array.length operands > index then
-    match operands.(index) with
-    | Iimm n -> Some n
-    | Ireg _ | Imem _ -> None
-  else
-    None
-
 let is_immediate operands ~index =
   if Array.length operands > index then
     match operands.(index) with
     | Iimm _ -> true
+    | Iimmf _ -> assert false
     | Ireg _ | Imem _ -> false
   else
     false
@@ -89,7 +82,7 @@ let is_immediate operands ~index =
 let is_stack arg operands ~index =
   if Array.length operands > index then
     match operands.(index) with
-    | Iimm _ -> false
+    | Iimm _ | Iimmf _ -> false
     | Ireg j -> stackp arg.(j)
     | Imem _ -> assert false
   else begin
@@ -101,7 +94,7 @@ let same_loc_arg0_res0 arg res operands =
   if Array.length operands > 0 then
     match operands.(0) with
     | Ireg j -> Reg.same_loc arg.(j) res.(0)
-    | Iimm _ | Imem _ -> false
+    | Iimm _ | Iimmf _ |  Imem _ -> false
   else
     Reg.same_loc arg.(0) res.(0)
 
@@ -122,12 +115,19 @@ method private one_mem_or_stack arg operands =
      match operands.(0), operands.(1) with
      | Iimm _, _ | _, Iimm _ -> arg
      | Ireg _, Ireg _ -> self#one_stack arg
+     | Iimmf _, Ireg j | Ireg j, Iimmf _ ->
+         (* float immediate is implemented as a memory load *)
+         if stackp arg.(j) then
+           arg.(j) <- self#makereg arg.(j);
+         arg
+     | Iimmf _, _ | _, Iimmf _
      | Imem _, Imem _ -> assert false
      | Imem (_,_,r), Ireg j | Ireg j, Imem (_,_,r) ->
          assert (Array.for_all (fun i -> not (stackp arg.(i))) r);
          if stackp arg.(j) then
            arg.(j) <- self#makereg arg.(j);
          arg
+
 (* First argument (= result) must be in register, second arg
          can reside in the stack or memory or immediate *)
 method private same_reg_res0_arg0 arg res operands =
@@ -143,7 +143,7 @@ method! reload_operation op arg res operands =
   (* If operand.(i) is a memory access, force any Reg.t it refers to
      to be in reg, not on the stack. *)
   Array.iter (function
-      | Ireg _ | Iimm _ -> ()
+      | Ireg _ | Iimm _ | Iimmf _ -> ()
       | Imem (_,_, r) ->
           Array.iter (fun j ->
             if stackp arg.(j) then

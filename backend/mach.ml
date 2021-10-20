@@ -77,6 +77,7 @@ type operation =
 
 type operand =
   | Iimm of int
+  | Iimmf of int64
   | Ireg of int
   | Imem of Cmm.memory_chunk * Arch.addressing_mode * int array
 
@@ -341,11 +342,12 @@ let equal_float_operation left right =
 let equal_operand left right =
   match left, right with
   | Iimm left, Iimm right -> Int.equal left right
+  | Iimmf left, Iimmf right -> Int64.equal left right
   | Ireg left, Ireg right -> Int.equal left right
   | Imem (chunk_left, addr_left, left), Imem (chunk_right, addr_right, right) ->
     Cmm.equal_memory_chunk chunk_left chunk_right &&
     Arch.equal_addressing_mode addr_left addr_right &&
     Array.length left = Array.length right &&
     Array.for_all2 Int.equal left right
-  | (Iimm _ | Ireg _ | Imem _),_ -> false
+  | (Iimm _ | Iimmf _ | Ireg _ | Imem _),_ -> false
 

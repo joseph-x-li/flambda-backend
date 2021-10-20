@@ -87,6 +87,7 @@ type operation =
 
 type operand =
   | Iimm of int
+  | Iimmf of int64
   | Ireg of int                                 (** Index into instruction.arg *)
   | Imem of Cmm.memory_chunk * Arch.addressing_mode * int array
     (** indexes into instruction.arg for the registers used in addressing_mode *)

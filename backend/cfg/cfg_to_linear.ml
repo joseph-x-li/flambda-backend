@@ -254,6 +254,7 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
           | 2 -> (
             match terminator.operands.(1) with
             | Iimm n -> Some n
+            | Iimmf _ -> assert false
             | Ireg _ | Imem _ -> None)
           | _ -> assert false
         in

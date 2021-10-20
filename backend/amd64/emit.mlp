@@ -252,6 +252,22 @@ let arg_reg i n =
      | Ireg j -> i.arg.(j)
      | _ -> Misc.fatal_error ("Emit.arg_reg " ^ string_of_int n)
 
+(* Floating-point constants *)
+
+let float_constants = ref ([] : (int64 * int) list)
+
+let add_float_constant cst =
+  try
+    List.assoc cst !float_constants
+  with Not_found ->
+    let lbl = new_label() in
+    float_constants := (cst, lbl) :: !float_constants;
+    lbl
+
+let emit_float_constant f lbl =
+  _label (emit_label lbl);
+  D.qword (Const f)
+
 (* Output an addressing mode *)
 
 let addressing addr typ i n =
@@ -295,6 +311,9 @@ let arg ?(emit_reg=reg) i n =
      match i.operands.(n) with
      | Ireg j -> emit_reg i.arg.(j)
      | Iimm c -> int c
+     | Iimmf f ->
+         let lbl = add_float_constant f in
+         (mem64_rip NONE (emit_label lbl))
      | Imem (c, addr, r) ->
         Array.iter (fun j ->
          if Reg.is_stack i.arg.(j)  then
@@ -311,7 +330,7 @@ let operand i ~index =
 let same_loc_arg_res0 i ~index =
   match operand i ~index with
   | Ireg j -> same_loc i.arg.(j) i.res.(0)
-  | Iimm _ | Imem _ -> false
+  | Iimm _ | Iimmf _ | Imem _ -> false
 
 (* Record live pointers at call points -- see Emitaux *)
 
@@ -435,7 +454,7 @@ let output_test_zero i =
      I.test (arg i 0) (arg i 0)
   | Ireg _ | Imem _ ->
      I.cmp (int 0) (arg i 0)
-  | Iimm _ -> assert false
+  | Iimm _ | Iimmf _ -> assert false
 
 (* Output a floating-point compare and branch *)
 
@@ -511,22 +530,6 @@ let output_epilogue f =
   end
   else
     f ()
-
-(* Floating-point constants *)
-
-let float_constants = ref ([] : (int64 * int) list)
-
-let add_float_constant cst =
-  try
-    List.assoc cst !float_constants
-  with Not_found ->
-    let lbl = new_label() in
-    float_constants := (cst, lbl) :: !float_constants;
-    lbl
-
-let emit_float_constant f lbl =
-  _label (emit_label lbl);
-  D.qword (Const f)
 
 let emit_global_label s =
   let lbl = Compilenv.make_symbol (Some s) in
@@ -855,7 +858,7 @@ let emit_instr fallthrough i =
       assert (same_loc_arg_res0 i ~index:0);
       (match operand i ~index:1 with
        | Iimm n -> instr_for_intop op (arg i 1) (res i 0)
-       | Imem _ -> assert false
+       | Imem _ | Iimmf _ -> assert false
        | Ireg j ->
            assert (same_loc i.arg.(j) (phys_reg 5 (* rcx *)));
            instr_for_intop op cl (res i 0))
@@ -871,6 +874,7 @@ let emit_instr fallthrough i =
           I.inc (res i 0)
        | Iimm (-1) when not !fastcode_flag ->
           I.dec (res i 0)
+       | Iimmf _ -> assert false
        | Iimm _ | Ireg _ | Imem _ ->
           instr_for_intop Iadd (arg i 1) (res i 0))
   | Lop(Iintop Isub) ->
@@ -879,6 +883,7 @@ let emit_instr fallthrough i =
           I.dec (res i 0)
        | Iimm (-1) when not !fastcode_flag ->
           I.inc (res i 0)
+       | Iimmf _ -> assert false
        | Iimm _ | Ireg _ | Imem _ ->
           instr_for_intop Isub (arg i 1) (res i 0))
   | Lop(Iintop Iand) ->
@@ -886,6 +891,7 @@ let emit_instr fallthrough i =
         match operand i ~index:1 with
         | Iimm n when n >= 0 && n <= 0xFFFF_FFFF && Reg.is_reg i.res.(0) ->
            (res32 i 0)
+        | Iimmf _ -> assert false
         | Iimm _ | Ireg _ | Imem _ ->
            (res i 0)
       in
@@ -1077,6 +1083,7 @@ let emit_instr fallthrough i =
           | Iimm 0 ->
             output_test_zero i;
             I.j (cond cmp) lbl
+          | Iimmf _ -> assert false
           | Iimm _ | Ireg _ | Imem _ ->
             I.cmp (arg i 1) (arg i 0);
             I.j (cond cmp) lbl)
