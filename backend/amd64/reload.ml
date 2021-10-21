@@ -98,9 +98,24 @@ let same_loc_arg0_res0 arg res operands =
   else
     Reg.same_loc arg.(0) res.(0)
 
+
 class reload = object (self)
 
 inherit Reloadgen.reload_generic as super
+
+(* If operand.(i) is a memory access, force any Reg.t it refers to
+   to be in reg, not on the stack. *)
+method private force_reg_for_mem_operands arg operands =
+  let arg = Array.copy arg in
+  (Array.iter (function
+     | Ireg _ | Iimm _ | Iimmf _ -> ()
+     | Imem (_,_, r) ->
+       Array.iter (fun j ->
+         if stackp arg.(j) then
+           arg.(j) <- self#makereg arg.(j))
+         r)
+     operands);
+  arg
 
 method private one_stack arg =
   if stackp arg.(0) && stackp arg.(1)
@@ -139,17 +154,7 @@ method private same_reg_res0_arg0 arg res operands =
   end else (arg, res)
 
 method! reload_operation op arg res operands =
-  let arg = Array.copy arg in
-  (* If operand.(i) is a memory access, force any Reg.t it refers to
-     to be in reg, not on the stack. *)
-  Array.iter (function
-      | Ireg _ | Iimm _ | Iimmf _ -> ()
-      | Imem (_,_, r) ->
-          Array.iter (fun j ->
-            if stackp arg.(j) then
-              arg.(j) <- self#makereg arg.(j))
-            r)
-    operands;
+  let arg = self#force_reg_for_mem_operands arg operands in
   match op with
   | Iintop(Iadd) when (not (same_loc_arg0_res0 arg res operands))
                       && is_immediate operands ~index:1 ->
@@ -228,6 +233,7 @@ method! reload_operation op arg res operands =
       super#reload_operation op arg res operands
 
 method! reload_test tst arg operands =
+  let arg = self#force_reg_for_mem_operands arg operands in
   match tst with
     Iinttest _ ->
       (* One of the two arguments can reside on stack *)
