@@ -246,11 +246,17 @@ method! memory_operands_supported_condition (op : Mach.test) chunk =
     | Ioddtest | Ieventest | Itruetest | Ifalsetest),
     (Word_int | Word_val) -> true
   | (Iinttest (Isigned _ | Iunsigned _)
+    | Ioddtest | Ieventest | Itruetest | Ifalsetest),
+    (Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+    | Thirtytwo_unsigned | Thirtytwo_signed) -> false
+  | (Iinttest (Isigned _ | Iunsigned _)
     | Ioddtest | Ieventest | Itruetest | Ifalsetest),_ ->
     Misc.fatal_errorf "memory_operands_condition inttest with chunk=%s"
       (Printcmm.chunk chunk) ()
   | (Ifloattest cmp, Double) -> true
-  | Ifloattest cmp, _ -> false
+  | Ifloattest cmp, _ ->
+    Misc.fatal_errorf "memory_operands_condition floattest with chunk=%s"
+      (Printcmm.chunk chunk) ()
 
 method! is_simple_expr e =
   match e with
