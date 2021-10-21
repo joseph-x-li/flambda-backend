@@ -63,7 +63,6 @@ end
  * end
  *)
 
-
 let save_cfg_as_dot : Cfg_with_layout.t -> string -> unit =
  fun cfg_with_layout msg ->
   Cfg_with_layout.save_as_dot cfg_with_layout ~show_instr:true ~show_exn:true
@@ -95,8 +94,9 @@ module Make_state (C : Container) : State = struct
         | true, false | false, true ->
           different location
             (Format.asprintf
-            "Cfg_equivalence: inconsistent substitution (trying to add %a %a)"
-            Label.print from Label.print to_))
+               "Cfg_equivalence: inconsistent substitution (trying to add %a \
+                %a)"
+               Label.print from Label.print to_))
       t.subst;
     Label.Tbl.replace t.subst from to_
 
@@ -420,15 +420,16 @@ let check_terminator_instruction :
     Cfg.terminator Cfg.instruction ->
     unit =
  fun state location expected result ->
-(* CR xclerc for xclerc: temporary, for testing *)
-  let check_arg = ref (
-    match expected.desc with
-    | Always _ -> false
-    | Never | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-    | Switch _ | Return | Raise _ | Tailcall _ | Call_no_return _ ->
-      true)
+  (* CR xclerc for xclerc: temporary, for testing *)
+  let check_arg =
+    ref
+      (match expected.desc with
+      | Always _ -> false
+      | Never | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
+      | Switch _ | Return | Raise _ | Tailcall _ | Call_no_return _ ->
+        true)
   in
-   begin
+  begin
     match expected.desc, result.desc with
     | Never, Never -> ()
     | Always lbl1, Always lbl2 -> State.add_to_explore state location lbl1 lbl2
@@ -454,7 +455,7 @@ let check_terminator_instruction :
            && Array.length expected.operands = 2
            && Array.length result.operands = 2
            && Mach.equal_operand expected.operands.(0) result.operands.(0)
-           && (array_equal Reg.same_loc expected.arg result.arg) ->
+           && array_equal Reg.same_loc expected.arg result.arg ->
       check_arg := false;
       State.add_to_explore state location lt1 lt2;
       State.add_to_explore state location gt1 gt2
@@ -477,8 +478,8 @@ let check_terminator_instruction :
       check_external_call_operation location cn1 cn2
     | _ -> different location "terminator"
   end;
-   check_instruction ~check_live:false ~check_dbg:false ~check_arg:!check_arg (-1)
-     location expected result
+  check_instruction ~check_live:false ~check_dbg:false ~check_arg:!check_arg
+    (-1) location expected result
  [@@ocaml.warning "-4"]
 
 let check_basic_block : State.t -> Cfg.basic_block -> Cfg.basic_block -> unit =
