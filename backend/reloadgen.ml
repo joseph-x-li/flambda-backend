@@ -95,20 +95,20 @@ method private reload i k =
   | Iop(Itailcall_ind) ->
       let newarg = self#makereg1 i.arg in
       k (insert_moves i.arg newarg
-           {i with arg = newarg})
+           (Mach.copy i ~arg:newarg))
   | Iop(Icall_imm _ | Iextcall _) ->
-      self#reload i.next (fun next -> k {i with next; })
+      self#reload i.next (fun next -> k (Mach.copy i ~next))
   | Iop(Icall_ind) ->
       let newarg = self#makereg1 i.arg in
       self#reload i.next (fun next ->
         k (insert_moves i.arg newarg
-             {i with arg = newarg; next; }))
+             (Mach.copy i ~arg:newarg ~next)))
   | Iop op ->
       let (newarg, newres) = self#reload_operation op i.arg i.res i.operands in
       self#reload i.next (fun next ->
         k (insert_moves i.arg newarg
-             {i with arg = newarg; res = newres;
-                     next = (insert_moves newres i.res next); }))
+             (Mach.copy i ~arg:newarg ~res:newres
+                     ~next:(insert_moves newres i.res next))))
   | Iifthenelse(tst, ifso, ifnot) ->
       let newarg = self#reload_test tst i.arg i.operands in
       self#reload ifso (fun ifso ->

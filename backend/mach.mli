@@ -92,7 +92,7 @@ type operand =
   | Imem of Cmm.memory_chunk * Arch.addressing_mode * int array
     (** indexes into instruction.arg for the registers used in addressing_mode *)
 
-type instruction =
+type instruction = private
   { desc: instruction_desc;
     next: instruction;
     arg: Reg.t array;
@@ -125,6 +125,31 @@ type fundecl =
     fun_num_stack_slots: int array;
     fun_contains_calls: bool;
   }
+
+val instruction
+  :  desc:instruction_desc
+  -> next:instruction
+  -> arg:Reg.t array
+  -> res:Reg.t array
+  -> operands:operand array
+  -> dbg:Debuginfo.t
+  -> instruction
+
+val update
+  :  ?live: Reg.Set.t
+  -> ?available_before:Reg_availability_set.t
+  -> ?available_across: Reg_availability_set.t option
+  -> instruction
+  -> unit
+
+val copy
+  :  ?desc:instruction_desc
+  -> ?next:instruction
+  -> ?arg:Reg.t array
+  -> ?res:Reg.t array
+  -> ?operands:operand array
+  -> instruction
+  -> instruction
 
 val dummy_instr: instruction
 val end_instr: unit -> instruction

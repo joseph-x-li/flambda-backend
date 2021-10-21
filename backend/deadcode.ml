@@ -30,7 +30,7 @@ let append a b =
   let rec append a b =
     match a.desc with
     | Iend -> b
-    | _ -> { a with next = append a.next b }
+    | _ -> Mach.copy a ~next:(append a.next b)
   in
   match b.desc with
   | Iend -> a
@@ -51,7 +51,7 @@ let rec deadcode i =
         assert (Array.length i.res > 0);  (* sanity check *)
         s
       end else begin
-        { i = {i with next = s.i};
+        { i = Mach.copy i ~next:s.i;
           regs = Reg.add_set_array i.live i.arg;
           exits = s.exits;
         }
@@ -60,7 +60,7 @@ let rec deadcode i =
       let ifso' = deadcode ifso in
       let ifnot' = deadcode ifnot in
       let s = deadcode i.next in
-      { i = {i with desc = Iifthenelse(test, ifso'.i, ifnot'.i); next = s.i};
+      { i = Mach.copy i ~desc:(Iifthenelse(test, ifso'.i, ifnot'.i)) ~next:s.i;
         regs = Reg.add_set_array i.live i.arg;
         exits = Int.Set.union s.exits
                   (Int.Set.union ifso'.exits ifnot'.exits);
@@ -69,7 +69,7 @@ let rec deadcode i =
       let dc = Array.map deadcode cases in
       let cases' = Array.map (fun c -> c.i) dc in
       let s = deadcode i.next in
-      { i = {i with desc = Iswitch(index, cases'); next = s.i};
+      { i = Mach.copy i ~desc:(Iswitch(index, cases')) ~next:s.i;
         regs = Reg.add_set_array i.live i.arg;
         exits = Array.fold_left
                   (fun acc c -> Int.Set.union acc c.exits) s.exits dc;
@@ -128,8 +128,8 @@ let rec deadcode i =
       }
     | _ ->
       let handlers = List.map (fun (n,ts,h) -> (n,ts,h.i)) used_handlers in
-      { i = { i with desc = Icatch(rec_flag, ts, handlers, body'.i);
-                     next = s.i };
+      { i = Mach.copy i ~desc:(Icatch(rec_flag, ts, handlers, body'.i))
+              ~next:s.i;
         regs = i.live;
         exits;
       }
@@ -140,8 +140,8 @@ let rec deadcode i =
       let body' = deadcode body in
       let handler' = deadcode handler in
       let s = deadcode i.next in
-      { i = {i with desc = Itrywith(body'.i, kind, (ts, handler'.i));
-                    next = s.i};
+      { i = Mach.copy i ~desc:(Itrywith(body'.i, kind, (ts, handler'.i)))
+              ~next:s.i;
         regs = i.live;
         exits = Int.Set.union s.exits
                   (Int.Set.union body'.exits handler'.exits);

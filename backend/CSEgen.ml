@@ -281,7 +281,7 @@ method private cse n i k =
       (* For moves, we associate the same value number to the result reg
          as to the argument reg. *)
       let n1 = set_move n i.arg.(0) i.res.(0) in
-      self#cse n1 i.next (fun next -> k { i with next; })
+      self#cse n1 i.next (fun next -> k (Mach.copy i ~next))
   | Iop (Icall_ind | Icall_imm _ | Iextcall _ | Iprobe _) ->
       (* For function calls and probes, we should at least forget:
          - equations involving memory loads, since the callee can
@@ -295,10 +295,10 @@ method private cse n i k =
          could be kept, but won't be usable for CSE as one of their
          arguments is always a memory load.  For simplicity, we
          just forget everything. *)
-      self#cse empty_numbering i.next (fun next -> k { i with next; })
+      self#cse empty_numbering i.next (fun next -> k (Mach.copy i ~next))
   | Iop Iopaque ->
       (* Assume arbitrary side effects from Iopaque *)
-      self#cse empty_numbering i.next (fun next -> k { i with next; })
+      self#cse empty_numbering i.next (fun next -> k (Mach.copy i ~next))
   | Iop (Ialloc _) ->
       (* For allocations, we must avoid extending the live range of a
          pseudoregister across the allocation if this pseudoreg
@@ -312,7 +312,7 @@ method private cse n i k =
          Hence, all equations over loads must be removed. *)
        let n1 = kill_addr_regs (self#kill_loads n) in
        let n2 = set_unknown_regs n1 i.res in
-       self#cse n2 i.next (fun next -> k { i with next; })
+       self#cse n2 i.next (fun next -> k (Mach.copy i ~next))
   | Iop op ->
       begin match self#class_of_operation op i.operands with
       | (Op_pure | Op_checkbound | Op_load) as op_class ->
@@ -339,26 +339,26 @@ method private cse n i k =
                      results.  Associate the result registers to
                      the result valnums of the previous operation. *)
                   let n3 = set_known_regs n2 i.res vres in
-                  self#cse n3 i.next (fun next -> k { i with next; })
+                  self#cse n3 i.next (fun next -> k (Mach.copy i ~next))
               end
           | None ->
               (* This operation produces a result we haven't seen earlier. *)
               let n3 = set_fresh_regs n2 i.res (op, i.operands, varg) op_class in
-              self#cse n3 i.next (fun next -> k { i with next; })
+              self#cse n3 i.next (fun next -> k (Mach.copy i ~next))
           end
       | Op_store false | Op_other ->
           (* An initializing store or an "other" operation do not invalidate
              any equations, but we do not know anything about the results. *)
          let n1 = set_unknown_regs n (Proc.destroyed_at_oper i.desc) in
          let n2 = set_unknown_regs n1 i.res in
-         self#cse n2 i.next (fun next -> k { i with next; })
+         self#cse n2 i.next (fun next -> k (Mach.copy i ~next))
       | Op_store true ->
           (* A non-initializing store can invalidate
              anything we know about prior loads. *)
          let n1 = set_unknown_regs n (Proc.destroyed_at_oper i.desc) in
          let n2 = set_unknown_regs n1 i.res in
          let n3 = self#kill_loads n2 in
-         self#cse n3 i.next (fun next -> k { i with next; })
+         self#cse n3 i.next (fun next -> k (Mach.copy i ~next))
       end
   (* For control structures, we set the numbering to empty at every
      join point, but propagate the current numbering across fork points. *)
@@ -367,24 +367,28 @@ method private cse n i k =
       self#cse n1 ifso (fun ifso ->
         self#cse n1 ifnot (fun ifnot ->
           self#cse empty_numbering i.next (fun next ->
-            k { i with desc = Iifthenelse(test, ifso, ifnot); next; })))
+            let desc = Iifthenelse(test, ifso, ifnot) in
+            k (Mach.copy i ~desc ~next))))
   | Iswitch(index, cases) ->
       let n1 = set_unknown_regs n (Proc.destroyed_at_oper i.desc) in
       self#cse_array n1 cases (fun cases ->
         self#cse empty_numbering i.next (fun next ->
-          k { i with desc = Iswitch(index, cases); next; }))
+          let desc = Iswitch(index, cases) in
+          k (Mach.copy i ~desc ~next)))
   | Icatch(rec_flag, ts, handlers, body) ->
       let nfail, t, handler_code = split3 handlers in
       self#cse_list empty_numbering handler_code (fun handler_code ->
         let handlers = combine3 nfail t handler_code in
         self#cse n body (fun body ->
           self#cse empty_numbering i.next (fun next ->
-            k { i with desc = Icatch(rec_flag, ts, handlers, body); next; })))
+            let desc = Icatch(rec_flag, ts, handlers, body) in
+            k (Mach.copy i ~desc ~next))))
   | Itrywith(body, kind, (ts, handler)) ->
       self#cse n body (fun body ->
         self#cse empty_numbering handler (fun handler ->
           self#cse empty_numbering i.next (fun next ->
-            k { i with desc = Itrywith(body, kind, (ts, handler)); next; })))
+            let desc = Itrywith(body, kind, (ts, handler)) in
+            k (Mach.copy i ~desc ~next))))
 
 method private cse_array n is k =
   self#cse_list n (Array.to_list is) (fun is -> k (Array.of_list is))

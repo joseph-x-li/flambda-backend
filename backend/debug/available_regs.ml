@@ -75,7 +75,7 @@ let check_invariants (instr : M.instruction) ~(avail_before : RAS.t) =
         (RAS.Ok avail_before)
         Printmach.regset (R.Set.diff instr.live
           (RD.Set.forget_debug_info avail_before))
-        Printmach.instr ({ instr with M. next = M.end_instr (); })
+        Printmach.instr (M.copy instr ~next:(M.end_instr ()))
     end;
     (* Every register that is an input to an instruction should be
        available. *)
@@ -87,7 +87,7 @@ let check_invariants (instr : M.instruction) ~(avail_before : RAS.t) =
         (RAS.print ~print_reg:Printmach.reg) (RAS.Ok avail_before)
         Printmach.regset avail_before_fdi
         Printmach.regset args
-        Printmach.instr ({ instr with M. next = M.end_instr (); })
+        Printmach.instr (M.copy instr ~next:(M.end_instr ()))
     end
 
 (* [available_regs ~instr ~avail_before] calculates, given the registers
@@ -115,7 +115,7 @@ let check_invariants (instr : M.instruction) ~(avail_before : RAS.t) =
 let rec available_regs (instr : M.instruction)
       ~(avail_before : RAS.t) : RAS.t =
   check_invariants instr ~avail_before;
-  instr.available_before <- avail_before;
+  Mach.update instr ~available_before:avail_before;
   let avail_across, avail_after =
     let ok set = RAS.Ok set in
     let unreachable = RAS.Unreachable in
@@ -356,7 +356,7 @@ let rec available_regs (instr : M.instruction)
         augment_availability_at_raise avail_before;
         None, unreachable
   in
-  instr.available_across <- avail_across;
+  Mach.update instr ~available_across:avail_across;
   match instr.desc with
   | Iend -> avail_after
   | _ -> available_regs instr.next ~avail_before:avail_after

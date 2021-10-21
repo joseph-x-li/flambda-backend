@@ -198,6 +198,36 @@ let mem_operand chunk mode ~index ~len =
   let r = Array.init len (fun i -> index + i) in
   Imem (chunk, mode, r)
 
+let instruction
+  : desc:instruction_desc
+  -> next:instruction
+  -> arg:Reg.t array
+  -> res:Reg.t array
+  -> operands:operand array
+  -> dbg:Debuginfo.t
+  -> instruction
+  =
+  fun ~desc ~next ~arg ~res ~operands ~dbg ->
+    (* CR gyorsh: check operands against args for consistency,
+       and maybe check Iimmf/Iimm against desc *)
+    { desc; next; arg; res; operands; dbg;
+      live = Reg.Set.empty;
+      available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
+      available_across = None;
+    }
+
+let update ?live ?available_before ?available_across i =
+  Option.iter (fun v -> i.live <- v) live;
+  Option.iter (fun v -> i.available_before <- v) available_before;
+  Option.iter (fun v -> i.available_across <- v) available_across
+
+let copy ?desc ?next ?arg ?res ?operands i =
+  let i = Option.fold ~none:i ~some:(fun v -> { i with desc=v }) desc in
+  let i = Option.fold ~none:i ~some:(fun v -> { i with next=v }) next in
+  let i = Option.fold ~none:i ~some:(fun v -> { i with arg=v }) arg in
+  let i = Option.fold ~none:i ~some:(fun v -> { i with res=v }) res in
+  Option.fold ~none:i ~some:(fun v -> { i with operands=v }) operands
+
 let free_conts_for_handlers fundecl =
   let module S = Numbers.Int.Set in
   let module M = Numbers.Int.Map in
