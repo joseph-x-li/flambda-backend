@@ -16,7 +16,7 @@ module type State = sig
 
   val make : unit -> t
 
-  val add_to_explore : t -> Label.t -> Label.t -> unit
+  val add_to_explore : t -> location -> Label.t -> Label.t -> unit
 
   val to_explore : t -> (Label.t * Label.t) option
 
@@ -63,6 +63,13 @@ end
  * end
  *)
 
+
+let save_cfg_as_dot : Cfg_with_layout.t -> string -> unit =
+ fun cfg_with_layout msg ->
+  Cfg_with_layout.save_as_dot cfg_with_layout ~show_instr:true ~show_exn:true
+    ~annotate_block:(Printf.sprintf "label:%d")
+    ~annotate_succ:(Printf.sprintf "%d->%d") msg
+
 module Make_state (C : Container) : State = struct
   type t =
     { subst : Label.t Label.Tbl.t;
@@ -80,20 +87,21 @@ module Make_state (C : Container) : State = struct
     let label_sets_to_check = [] in
     { to_explore; subst; seen; labels_to_check; label_sets_to_check }
 
-  let add_subst t from to_ =
+  let add_subst t location from to_ =
     Label.Tbl.iter
       (fun key data ->
         match Label.equal key from, Label.equal data to_ with
         | true, true | false, false -> ()
         | true, false | false, true ->
-          Misc.fatal_errorf
+          different location
+            (Format.asprintf
             "Cfg_equivalence: inconsistent substitution (trying to add %a %a)"
-            Label.print from Label.print to_)
+            Label.print from Label.print to_))
       t.subst;
     Label.Tbl.replace t.subst from to_
 
-  let add_to_explore t lbl1 lbl2 =
-    add_subst t lbl1 lbl2;
+  let add_to_explore t location lbl1 lbl2 =
+    add_subst t location lbl1 lbl2;
     C.add (lbl1, lbl2) t.to_explore
 
   let to_explore t = C.get t.to_explore
@@ -319,7 +327,7 @@ let check_basic : State.t -> location -> Cfg.basic -> Cfg.basic -> unit =
   | Reloadretaddr, Reloadretaddr -> ()
   | ( Pushtrap { lbl_handler = expected_lbl_handler },
       Pushtrap { lbl_handler = result_lbl_handler } ) ->
-    State.add_to_explore state expected_lbl_handler result_lbl_handler
+    State.add_to_explore state location expected_lbl_handler result_lbl_handler
   | Poptrap, Poptrap -> ()
   | Prologue, Prologue -> ()
   | _ -> different location "basic"
@@ -412,41 +420,54 @@ let check_terminator_instruction :
     Cfg.terminator Cfg.instruction ->
     unit =
  fun state location expected result ->
-  begin
+(* CR xclerc for xclerc: temporary, for testing *)
+  let check_arg = ref (
+    match expected.desc with
+    | Always _ -> false
+    | Never | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
+    | Switch _ | Return | Raise _ | Tailcall _ | Call_no_return _ ->
+      true)
+  in
+   begin
     match expected.desc, result.desc with
     | Never, Never -> ()
-    | Always lbl1, Always lbl2 -> State.add_to_explore state lbl1 lbl2
+    | Always lbl1, Always lbl2 -> State.add_to_explore state location lbl1 lbl2
     | ( Parity_test { ifso = ifso1; ifnot = ifnot1 },
         Parity_test { ifso = ifso2; ifnot = ifnot2 } ) ->
-      State.add_to_explore state ifso1 ifso2;
-      State.add_to_explore state ifnot1 ifnot2
+      State.add_to_explore state location ifso1 ifso2;
+      State.add_to_explore state location ifnot1 ifnot2
     | ( Truth_test { ifso = ifso1; ifnot = ifnot1 },
         Truth_test { ifso = ifso2; ifnot = ifnot2 } ) ->
-      State.add_to_explore state ifso1 ifso2;
-      State.add_to_explore state ifnot1 ifnot2
+      State.add_to_explore state location ifso1 ifso2;
+      State.add_to_explore state location ifnot1 ifnot2
     | ( Float_test { lt = lt1; eq = eq1; gt = gt1; uo = uo1 },
         Float_test { lt = lt2; eq = eq2; gt = gt2; uo = uo2 } ) ->
-      State.add_to_explore state lt1 lt2;
-      State.add_to_explore state eq1 eq2;
-      State.add_to_explore state gt1 gt2;
-      State.add_to_explore state uo1 uo2
-    | ( Int_test { lt = lt1; eq = eq1; gt = gt1; is_signed = is_signed1 },
-        Int_test { lt = lt2; eq = eq2; gt = gt2; is_signed = is_signed2 } )
-      when Bool.equal is_signed1 is_signed2 ->
-      State.add_to_explore state lt1 lt2;
-      State.add_to_explore state eq1 eq2;
-      State.add_to_explore state gt1 gt2
-    (* The following case is morally the same as the previous one, with a
-       immediate which is off by one. *)
+      State.add_to_explore state location lt1 lt2;
+      State.add_to_explore state location eq1 eq2;
+      State.add_to_explore state location gt1 gt2;
+      State.add_to_explore state location uo1 uo2
     | ( Int_test { lt = lt1; eq = eq1; gt = gt1; is_signed = is_signed1 },
         Int_test { lt = lt2; eq = eq2; gt = gt2; is_signed = is_signed2 } )
       when Bool.equal is_signed1 is_signed2
            && special_immediates expected result
-           && Label.equal lt1 eq1 && Label.equal eq2 gt2 ->
-      State.add_to_explore state lt1 lt2;
-      State.add_to_explore state gt1 gt2
+           && Label.equal lt1 eq1 && Label.equal eq2 gt2
+           && Array.length expected.operands = 2
+           && Array.length result.operands = 2
+           && Mach.equal_operand expected.operands.(0) result.operands.(0)
+           && (array_equal Reg.same_loc expected.arg result.arg) ->
+      check_arg := false;
+      State.add_to_explore state location lt1 lt2;
+      State.add_to_explore state location gt1 gt2
+    | ( Int_test { lt = lt1; eq = eq1; gt = gt1; is_signed = is_signed1 },
+        Int_test { lt = lt2; eq = eq2; gt = gt2; is_signed = is_signed2 } )
+      when Bool.equal is_signed1 is_signed2 ->
+      State.add_to_explore state location lt1 lt2;
+      State.add_to_explore state location eq1 eq2;
+      State.add_to_explore state location gt1 gt2
+    (* The following case is morally the same as the previous one, with a
+       immediate which is off by one. *)
     | Switch a1, Switch a2 when Array.length a1 = Array.length a2 ->
-      Array.iter2 (fun l1 l2 -> State.add_to_explore state l1 l2) a1 a2
+      Array.iter2 (fun l1 l2 -> State.add_to_explore state location l1 l2) a1 a2
     | Return, Return -> ()
     | Raise rk1, Raise rk2 when equal_raise_kind rk1 rk2 -> ()
     | Tailcall tc1, Tailcall tc2 ->
@@ -456,16 +477,8 @@ let check_terminator_instruction :
       check_external_call_operation location cn1 cn2
     | _ -> different location "terminator"
   end;
-  (* CR xclerc for xclerc: temporary, for testing *)
-  let check_arg =
-    match expected.desc with
-    | Always _ -> false
-    | Never | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-    | Switch _ | Return | Raise _ | Tailcall _ | Call_no_return _ ->
-      true
-  in
-  check_instruction ~check_live:false ~check_dbg:false ~check_arg (-1) location
-    expected result
+   check_instruction ~check_live:false ~check_dbg:false ~check_arg:!check_arg (-1)
+     location expected result
  [@@ocaml.warning "-4"]
 
 let check_basic_block : State.t -> Cfg.basic_block -> Cfg.basic_block -> unit =
@@ -514,13 +527,14 @@ let check_cfg : State.t -> Cfg.t -> Cfg.t -> unit =
  fun state expected result ->
   let expected_num_blocks = Label.Tbl.length expected.blocks in
   let result_num_blocks = Label.Tbl.length result.blocks in
+  let location = "CFG" in
   if not (Int.equal expected_num_blocks result_num_blocks)
-  then different "CFG" "number of blocks";
+  then different location "number of blocks";
   if not (String.equal expected.fun_name result.fun_name)
-  then different "CFG" "fun_name";
+  then different location "fun_name";
   if not (Debuginfo.compare expected.fun_dbg result.fun_dbg = 0)
-  then different "CFG" "fun_dbg";
-  State.add_to_explore state expected.entry_label result.entry_label;
+  then different location "fun_dbg";
+  State.add_to_explore state location expected.entry_label result.entry_label;
   explore_cfg state expected result
 
 let check_layout : State.t -> Label.t list -> Label.t list -> unit =
@@ -535,12 +549,6 @@ let check_layout : State.t -> Label.t list -> Label.t list -> unit =
     (fun expected_label result_label ->
       State.add_labels_to_check state "layout" expected_label result_label)
     expected result
-
-let save_cfg_as_dot : Cfg_with_layout.t -> string -> unit =
- fun cfg_with_layout msg ->
-  Cfg_with_layout.save_as_dot cfg_with_layout ~show_instr:true ~show_exn:true
-    ~annotate_block:(Printf.sprintf "label:%d")
-    ~annotate_succ:(Printf.sprintf "%d->%d") msg
 
 let check_cfg_with_layout :
     Mach.fundecl -> Cfg_with_layout.t -> Cfg_with_layout.t -> unit =

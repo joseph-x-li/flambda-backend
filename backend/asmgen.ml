@@ -174,7 +174,7 @@ let (++) x f = f x
 
 let ocamlcfg_verbose =
   match Sys.getenv_opt "OCAMLCFG_VERBOSE" with
-  | Some "1" -> true
+  | Some "1" -> Cfg.verbose := true; true
   | Some _ | None -> false
 
 let test_cfgize (f : Mach.fundecl) (res : Linear.fundecl) : unit =
@@ -223,6 +223,7 @@ let compile_fundecl ~ppf_dump fd_cmm =
   ++ Profile.record ~accumulate:true "linearize" (fun (f : Mach.fundecl) ->
       let res = Linearize.fundecl f in
       count_spills ppf_dump res;
+      pass_dump_linear_if ppf_dump dump_linear "Linearized code" res |> ignore;
       (* CR xclerc for xclerc: temporary, for testing. *)
       if !Clflags.use_ocamlcfg then begin
         test_cfgize f res;

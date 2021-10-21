@@ -269,6 +269,17 @@ let dump_terminator ppf ?(sep = "\n") ti =
     fprintf ppf "if uo goto %d%s" uo sep
   | Int_test { lt; eq; gt; is_signed } ->
     let cmp = if is_signed then " s" else " u" in
+    let cmp =
+      if Array.length ti.operands = 0 then cmp
+      else
+        Array.fold_left (fun cmp operand ->
+          match (operand : Mach.operand) with
+          | Iimm n ->  Printf.sprintf "%s imm %d" cmp n
+          | Iimmf f -> Printf.sprintf "%s immf %f" cmp (Int64.float_of_bits f)
+          | Ireg j -> Printf.sprintf "%s reg %d" cmp j
+          | Imem _ -> Printf.sprintf "%s mem" cmp)
+          cmp ti.operands
+    in
     fprintf ppf "if <%s goto %d%s" cmp lt sep;
     fprintf ppf "if =%s goto %d%s" cmp eq sep;
     fprintf ppf "if >%s goto %d%s" cmp gt sep
