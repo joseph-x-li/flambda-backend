@@ -114,7 +114,47 @@ type fundecl =
     fun_contains_calls: bool;
   }
 
+(* CR gyorsh: temporary, for testing *)
+let memory_operands_verbose =
+  match Sys.getenv_opt "MEMORY_OPERANDS_VERBOSE" with
+  | Some "1" -> true
+  | Some _ | None -> false
+
+let check_operands i =
+  (* CR gyorsh: maybe check Iimmf/Iimm and arg types against desc types? *)
+  if memory_operands_verbose then begin
+    let n = Array.length i.arg in
+    let indexes =
+      Array.fold_left (fun acc operand ->
+        match operand with
+        | Iimm _ | Iimmf _ -> acc
+        | Ireg j ->
+          if (j >= n) then
+            Misc.fatal_errorf "Mach.check_operands: %d not in args (args length = %d"
+              j n ();
+          j :: acc
+        | Imem (chunk,addr,r) ->
+          Array.iter (fun j ->
+            if (j >= n) then
+              Misc.fatal_errorf "Mach.check_operands: %d not in args (args length = %d"
+                j n ())
+            r;
+          (Array.to_list r) @ acc
+      ) [] i.operands
+      |> List.sort_uniq Int.compare
+    in
+    if List.length indexes < Array.length i.arg then
+      Misc.fatal_errorf "Mach.check_operands: leng of indexes = %d, length of args = %d"
+        (List.length indexes) (Array.length i.arg) ();
+    List.iteri (fun i j ->
+      if i != j then
+        Misc.fatal_errorf "Indexes.(%d)=%d" i j ())
+      indexes
+  end;
+  i
+
 let rec dummy_instr =
+  (* check_operands is not allowed here, but it is fine. *)
   { desc = Iend;
     next = dummy_instr;
     arg = [||];
@@ -127,6 +167,7 @@ let rec dummy_instr =
   }
 
 let end_instr () =
+  check_operands
   { desc = Iend;
     next = dummy_instr;
     arg = [||];
@@ -139,6 +180,7 @@ let end_instr () =
   }
 
 let instr_cons d a r o n =
+  check_operands
   { desc = d; next = n; arg = a; res = r; operands = o;
     dbg = Debuginfo.none; live = Reg.Set.empty;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
@@ -146,6 +188,7 @@ let instr_cons d a r o n =
   }
 
 let instr_cons_debug d a r o dbg n =
+  check_operands
   { desc = d; next = n; arg = a; res = r; dbg = dbg; live = Reg.Set.empty;
     operands = o;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
@@ -208,13 +251,12 @@ let instruction
   -> instruction
   =
   fun ~desc ~next ~arg ~res ~operands ~dbg ->
-    (* CR gyorsh: check operands against args for consistency,
-       and maybe check Iimmf/Iimm against desc *)
-    { desc; next; arg; res; operands; dbg;
-      live = Reg.Set.empty;
-      available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
-      available_across = None;
-    }
+    check_operands
+      { desc; next; arg; res; operands; dbg;
+        live = Reg.Set.empty;
+        available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
+        available_across = None;
+      }
 
 let update ?live ?available_before ?available_across i =
   Option.iter (fun v -> i.live <- v) live;
@@ -226,7 +268,8 @@ let copy ?desc ?next ?arg ?res ?operands i =
   let i = Option.fold ~none:i ~some:(fun v -> { i with next=v }) next in
   let i = Option.fold ~none:i ~some:(fun v -> { i with arg=v }) arg in
   let i = Option.fold ~none:i ~some:(fun v -> { i with res=v }) res in
-  Option.fold ~none:i ~some:(fun v -> { i with operands=v }) operands
+  let i = Option.fold ~none:i ~some:(fun v -> { i with operands=v }) operands in
+  check_operands i
 
 let free_conts_for_handlers fundecl =
   let module S = Numbers.Int.Set in
