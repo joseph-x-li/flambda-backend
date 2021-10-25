@@ -88,17 +88,14 @@ type operation =
 type operand =
   | Iimm of int
   | Iimmf of int64
-  | Ireg of int                                 (** Index into instruction.arg *)
-  | Imem of Cmm.memory_chunk * Arch.addressing_mode * int array
-    (** indexes into instruction.arg for the registers used in addressing_mode *)
+  | Ireg of Reg.t
+  | Imem of Cmm.memory_chunk * Arch.addressing_mode * Reg.t array
 
 type instruction = private
   { desc: instruction_desc;
     next: instruction;
-    arg: Reg.t array;
     res: Reg.t array;
     operands: operand array;
-    (** At least as long as args, or Empty to denote all operands are as in args. *)
     dbg: Debuginfo.t;
     mutable live: Reg.Set.t;
     mutable available_before: Reg_availability_set.t;
@@ -129,7 +126,6 @@ type fundecl =
 val instruction
   :  desc:instruction_desc
   -> next:instruction
-  -> arg:Reg.t array
   -> res:Reg.t array
   -> operands:operand array
   -> dbg:Debuginfo.t
@@ -145,7 +141,6 @@ val update
 val copy
   :  ?desc:instruction_desc
   -> ?next:instruction
-  -> ?arg:Reg.t array
   -> ?res:Reg.t array
   -> ?operands:operand array
   -> instruction
@@ -154,16 +149,14 @@ val copy
 val dummy_instr: instruction
 val end_instr: unit -> instruction
 val instr_cons:
-      instruction_desc -> Reg.t array -> Reg.t array -> operand array ->
+      instruction_desc -> Reg.t array -> operand array ->
       instruction -> instruction
 val instr_cons_debug:
-      instruction_desc -> Reg.t array -> Reg.t array -> operand array ->
+      instruction_desc -> Reg.t array -> operand array ->
       Debuginfo.t -> instruction -> instruction
 val instr_iter: (instruction -> unit) -> instruction -> unit
 
 val operation_can_raise : operation -> bool
-val mem_operand : Cmm.memory_chunk -> Arch.addressing_mode ->
-      index:int -> len:int -> operand
 
 val free_conts_for_handlers : fundecl -> Numbers.Int.Set.t Numbers.Int.Map.t
 val equal_trap_stack : trap_stack -> trap_stack -> bool
@@ -171,4 +164,4 @@ val equal_trap_stack : trap_stack -> trap_stack -> bool
 val equal_integer_comparison : integer_comparison -> integer_comparison -> bool
 val equal_integer_operation : integer_operation -> integer_operation -> bool
 val equal_float_operation : float_operation -> float_operation -> bool
-val equal_operand : operand -> operand -> bool
+

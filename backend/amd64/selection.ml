@@ -116,16 +116,8 @@ let pseudoregs_for_operation op arg res operands =
       ([| rax; arg.(1) |], [| rdx |])
   | Iintop(Ilsl|Ilsr|Iasr) ->
      (* arg.(0) and res.(0) must be the same *)
-     let is_immediate_arg operands ~index =
-       if Array.length operands > index then
-         match operands.(index) with
-         | Iimm _ -> true
-         | Iimmf _ -> assert false
-         | Ireg _ | Imem _ -> false
-       else
-         false
-     in
-     if is_immediate_arg operands ~index:1 then
+
+     if Selectgen.Operands.is_immediate operands ~index:1 then
        same_reg_res0_arg0 arg res
      else
        (* For shifts with variable shift count, second arg must be in rcx *)
@@ -316,6 +308,8 @@ method select_condition cond =
       super#select_condition cond
 
 method! select_operation op args dbg =
+  (* CR gyorsh: some operations, like crc32 and roundsd can have memory operands *)
+  let in_reg = Selectgen.Operands.in_registers () in
   match op with
   (* Recognize the LEA instruction *)
     Caddi | Caddv | Cadda | Csubi ->
@@ -323,7 +317,7 @@ method! select_operation op args dbg =
         (Iindexed _, _, _)
       | (Iindexed2 0, _, _) -> super#select_operation op args dbg
       | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr,
-         arg, _) -> (Ispecific(Ilea addr), [arg], [||])
+         arg, _) -> (Ispecific(Ilea addr), [arg], in_reg)
       end
   (* Recognize float arithmetic with memory. *)
   | Cextcall { func = "sqrt"; alloc = false; } ->
@@ -332,30 +326,30 @@ method! select_operation op args dbg =
                ty = [|Int|]; ty_args = [XFloat] }
   | Cextcall { func = "caml_int64_float_of_bits_unboxed"; alloc = false;
                ty = [|Float|]; ty_args = [XInt64] } ->
-     Imove, args, [||]
+     Imove, args, in_reg
   | Cextcall { func; builtin = true; ty = ret; ty_args = _; } ->
       begin match func, ret with
-      | "caml_rdtsc_unboxed", [|Int|] -> Ispecific Irdtsc, args, [||]
-      | "caml_rdpmc_unboxed", [|Int|] -> Ispecific Irdpmc, args, [||]
+      | "caml_rdtsc_unboxed", [|Int|] -> Ispecific Irdtsc, args, in_reg
+      | "caml_rdpmc_unboxed", [|Int|] -> Ispecific Irdpmc, args, in_reg
       | ("caml_int64_crc_unboxed", [|Int|]
         | "caml_int_crc_untagged", [|Int|]) when !Arch.crc32_support ->
-          Ispecific Icrc32q, args, [||]
+          Ispecific Icrc32q, args, in_reg
       | "caml_float_iround_half_to_even_unboxed", [|Int|] ->
-         Ispecific Ifloat_iround, args, [||]
+         Ispecific Ifloat_iround, args, in_reg
       | "caml_float_round_half_to_even_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Half_to_even), args, [||]
+         Ispecific (Ifloat_round Half_to_even), args, in_reg
       | "caml_float_round_up_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Up), args, [||]
+         Ispecific (Ifloat_round Up), args, in_reg
       | "caml_float_round_down_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Down), args, [||]
+         Ispecific (Ifloat_round Down), args, in_reg
       | "caml_float_round_towards_zero_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Towards_zero), args, [||]
+         Ispecific (Ifloat_round Towards_zero), args, in_reg
       | "caml_float_round_current_unboxed", [|Float|] ->
-         Ispecific (Ifloat_round Current), args, [||]
+         Ispecific (Ifloat_round Current), args, in_reg
       | "caml_float_min_unboxed", [|Float|] ->
-         Ispecific Ifloat_min, args, [||]
+         Ispecific Ifloat_min, args, in_reg
       | "caml_float_max_unboxed", [|Float|] ->
-         Ispecific Ifloat_max, args, [||]
+         Ispecific Ifloat_max, args, in_reg
       | _ ->
         super#select_operation op args dbg
       end
@@ -365,22 +359,22 @@ method! select_operation op args dbg =
         [loc; Cop(Caddi, [Cop(Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
         when loc = loc' && is_immediate n ->
           let (addr, arg, _) = self#select_addressing chunk loc in
-          (Ispecific(Ioffset_loc(n, addr)), [arg], [||])
+          (Ispecific(Ioffset_loc(n, addr)), [arg], in_reg)
       | _ ->
           super#select_operation op args dbg
       end
   | Cextcall { func = "caml_bswap16_direct"; } ->
-      (Ispecific (Ibswap 16), args, [||])
+      (Ispecific (Ibswap 16), args, in_reg)
   | Cextcall { func = "caml_int32_direct_bswap"; } ->
-      (Ispecific (Ibswap 32), args, [||])
+      (Ispecific (Ibswap 32), args, in_reg)
   | Cextcall { func = "caml_int64_direct_bswap"; }
   | Cextcall { func = "caml_nativeint_direct_bswap"; } ->
-      (Ispecific (Ibswap 64), args, [||])
+      (Ispecific (Ibswap 64), args, in_reg)
   (* Recognize sign extension *)
   | Casr ->
       begin match args with
         [Cop(Clsl, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
-          (Ispecific Isextend32, [k], [||])
+          (Ispecific Isextend32, [k], in_reg)
         | _ -> super#select_operation op args dbg
       end
   (* Recognize zero extension *)
@@ -390,7 +384,7 @@ method! select_operation op args dbg =
     | [arg; Cconst_natint (0xffff_ffffn, _)]
     | [Cconst_int (0xffff_ffff, _); arg]
     | [Cconst_natint (0xffff_ffffn, _); arg] ->
-      Ispecific Izextend32, [arg], [||]
+      Ispecific Izextend32, [arg], in_reg
     | _ -> super#select_operation op args dbg
     end
   | Cprefetch { is_write; locality; } ->
@@ -409,7 +403,7 @@ method! select_operation op args dbg =
       let addr, eloc, _ =
         self#select_addressing Word_int (one_arg "prefetch" args)
       in
-      Ispecific (Iprefetch { is_write; addr; locality; }), [eloc], [||]
+      Ispecific (Iprefetch { is_write; addr; locality; }), [eloc], in_reg
   | Ccmpf comp ->
       let _,need_swap = Arch.float_compare_and_need_swap comp in
       let args =

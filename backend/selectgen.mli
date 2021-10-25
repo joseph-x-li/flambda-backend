@@ -29,6 +29,28 @@ val env_find : Backend_var.t -> environment -> Reg.t array
 
 val size_expr : environment -> Cmm.expression -> int
 
+(* During selection, the shape of operands is chosen before the arguments
+   are converted from Cmm expression to Mach expressions. This module
+   specifies how to construct operands and then emit them
+   once the registers are determined in which the result of
+   argument evaluation is place. *)
+module Operands : sig
+  type t         (** a constructor for operand array  *)
+  type operand_builder (** a constructor for operand  *)
+
+  val mem : Cmm.memory_chunk -> Arch.addressing_mode ->
+    index:int -> len:int -> operand_builder
+  val reg : index:int -> operand_builder
+  val imm : int -> operand_builder
+  val immf : int64 -> operand_builder
+
+  val selected : operand_builder array -> t
+  val in_registers : unit -> t
+  val emit : t -> Reg.t array -> Mach.operand array
+
+  val is_immediate : t -> index:int -> bool
+end
+
 module Effect : sig
   type t =
     | None
@@ -88,7 +110,7 @@ class virtual selector_generic : object
     Cmm.operation ->
     Cmm.expression list ->
     Debuginfo.t ->
-    Mach.operation * Cmm.expression list * Mach.operand array
+    Mach.operation * Cmm.expression list * Operands.t
     (* Can be overridden to deal with special arithmetic instructions *)
   method swap_operands : Mach.operation -> Mach.operation option
     (* Can be overridden to deal with special operands whose
@@ -101,16 +123,16 @@ class virtual selector_generic : object
   method select_operands :
     Mach.operation ->
     Cmm.expression list ->
-    Mach.operation * Cmm.expression list * Mach.operand array
+    Mach.operation * Cmm.expression list * Operands.t
     (* Can be overridden to deal with special operands *)
   method select_operands_condition :
     Mach.test ->
     Cmm.expression list ->
-    Mach.test * Cmm.expression * Mach.operand array
+    Mach.test * Cmm.expression * Operands.t
     (* Can be overridden to deal with special operands *)
   method select_condition :
     Cmm.expression ->
-    Mach.test * Cmm.expression * Mach.operand array
+    Mach.test * Cmm.expression * Operands.t
     (* Can be overridden to deal with special test instructions *)
   method select_store :
     bool -> Arch.addressing_mode -> Cmm.expression ->
@@ -127,12 +149,12 @@ class virtual selector_generic : object
        integer registers. *)
   method insert_op :
     environment -> Mach.operation -> Reg.t array -> Reg.t array
-      -> Mach.operand array -> Reg.t array
+      -> Operands.t -> Reg.t array
     (* Can be overridden to deal with 2-address instructions
        or instructions with hardwired input/output registers *)
   method insert_op_debug :
     environment -> Mach.operation -> Debuginfo.t -> Reg.t array
-      -> Reg.t array -> Mach.operand array -> Reg.t array
+      -> Reg.t array -> Operands.t -> Reg.t array
     (* Can be overridden to deal with 2-address instructions
        or instructions with hardwired input/output registers *)
   method insert_move_extcall_arg :
@@ -181,10 +203,10 @@ class virtual selector_generic : object
   method extract : Mach.instruction
   method insert :
     environment -> Mach.instruction_desc -> Reg.t array -> Reg.t array ->
-    Mach.operand array -> unit
+    Operands.t -> unit
   method insert_debug :
     environment -> Mach.instruction_desc -> Debuginfo.t ->
-      Reg.t array -> Reg.t array -> Mach.operand array -> unit
+      Reg.t array -> Reg.t array -> Operands.t -> unit
   method insert_move : environment -> Reg.t -> Reg.t -> unit
   method insert_move_args :
     environment -> Reg.t array -> Reg.t array -> int -> unit
