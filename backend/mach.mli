@@ -146,6 +146,8 @@ val copy
   -> instruction
   -> instruction
 
+val arg_reg : instruction -> int -> Reg.t
+
 val dummy_instr: instruction
 val end_instr: unit -> instruction
 val instr_cons:

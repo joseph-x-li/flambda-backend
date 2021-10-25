@@ -135,6 +135,11 @@ let end_instr () =
     available_across = None;
   }
 
+let arg_reg i n =
+  match i.operand.(n) with
+  | Ireg r -> r
+  | _ -> assert false
+
 let instr_cons d r o n =
   { desc = d; next = n; res = r; operands = o;
     dbg = Debuginfo.none; live = Reg.Set.empty;
