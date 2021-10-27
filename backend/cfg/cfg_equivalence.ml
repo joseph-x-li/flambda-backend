@@ -333,17 +333,6 @@ let check_basic : State.t -> location -> Cfg.basic -> Cfg.basic -> unit =
   | _ -> different location "basic"
  [@@ocaml.warning "-4"]
 
-let equal_operand left right =
-  match left, right with
-  | Iimm left, Iimm right -> Int.equal left right
-  | Iimmf left, Iimmf right -> Int64.equal left right
-  | Ireg left, Ireg right -> Reg.smae_loc left right
-  | Imem (chunk_left, addr_left, left), Imem (chunk_right, addr_right, right) ->
-    Cmm.equal_memory_chunk chunk_left chunk_right &&
-    Arch.equal_addressing_mode addr_left addr_right &&
-    array_equal Reg.same_loc left right
-  | (Iimm _ | Iimmf _ | Ireg _ | Imem _),_ -> false
-
 let check_instruction :
     type a.
     check_live:bool ->
@@ -461,7 +450,8 @@ let check_terminator_instruction :
       when Bool.equal is_signed1 is_signed2
            && special_immediates expected result
            && Label.equal lt1 eq1 && Label.equal eq2 gt2
-           && array_equal equal_operand expected.operands.(0) result.operands.(0)
+           && array_equal equal_operand expected.operands.(0)
+                result.operands.(0) ->
       check_arg := false;
       State.add_to_explore state location lt1 lt2;
       State.add_to_explore state location gt1 gt2

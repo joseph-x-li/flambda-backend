@@ -49,27 +49,20 @@ let regs ppf v =
   | n -> reg ppf v.(0);
          for i = 1 to n-1 do fprintf ppf " %a" reg v.(i) done
 
-let operand arg ppf = function
-  | Ireg i -> fprintf ppf "reg %a" reg arg.(i)
+let operand ppf = function
+  | Ireg r -> fprintf ppf "reg %a" reg r
   | Iimm i -> fprintf ppf "imm %i" i
   | Iimmf f -> fprintf ppf "immf %F" (Int64.float_of_bits f)
-  | Imem (c, a, [| |]) -> fprintf ppf "mem %s[%a]"
-                            (Printcmm.chunk c)
-                            (Arch.print_addressing reg a)
-                            [||]
   | Imem (c, a, r) ->
-    let i = r.(0) in
-    fprintf ppf "mem %s[%a]"
-      (Printcmm.chunk c)
-      (Arch.print_addressing reg a)
-      (Array.sub arg i (Array.length arg - i))
+    fprintf ppf "mem %s[%a]" (Printcmm.chunk c)
+      (Arch.print_addressing reg a) r
 
 let operands arg ppf v =
   match Array.length v with
   | 0 -> ()
-  | 1 -> (operand arg) ppf v.(0)
-  | n -> (operand arg) ppf v.(0);
-         for i = 1 to n-1 do fprintf ppf ", %a" (operand arg) v.(i) done
+  | 1 -> operand ppf v.(0)
+  | n -> operand ppf v.(0);
+         for i = 1 to n-1 do fprintf ppf ", %a" operand v.(i) done
 
 let regset ppf s =
   let first = ref true in
@@ -228,7 +221,7 @@ let operation op arg ppf res ops =
 let rec instr ppf i =
   if !Clflags.dump_live then begin
     fprintf ppf "@[<1>{%a" regsetaddr i.live;
-    if Array.length i.arg > 0 then fprintf ppf "@ +@ %a" regs i.arg;
+    if Array.length i.operands > 0 then fprintf ppf "@ +@ %a" operands i.operands;
     fprintf ppf "}@]@,";
     if !Clflags.dump_avail then begin
       let module RAS = Reg_availability_set in
@@ -244,18 +237,18 @@ let rec instr ppf i =
   begin match i.desc with
   | Iend -> ()
   | Iop op ->
-      operation op i.arg ppf i.res i.operands
+      operation op i.operands ppf i.res
   | Ireturn traps ->
-      fprintf ppf "return%a %a" Printcmm.trap_action_list traps regs i.arg
+      fprintf ppf "return%a %a" Printcmm.trap_action_list traps regs i.operands
   | Iifthenelse(tst, ifso, ifnot) ->
-      fprintf ppf "@[<v 2>if %a then@,%a" (test tst i.operands) i.arg instr ifso;
+      fprintf ppf "@[<v 2>if %a then@,%a" (test tst i.operands) i.operands instr ifso;
       begin match ifnot.desc with
       | Iend -> ()
       | _ -> fprintf ppf "@;<0 -2>else@,%a" instr ifnot
       end;
       fprintf ppf "@;<0 -2>endif@]"
   | Iswitch(index, cases) ->
-      fprintf ppf "switch %a" reg i.arg.(0);
+      fprintf ppf "switch %a" operand i.operands.(0);
       for i = 0 to Array.length cases - 1 do
         fprintf ppf "@,@[<v 2>@[";
         for j = 0 to Array.length index - 1 do
@@ -286,7 +279,7 @@ let rec instr ppf i =
       fprintf ppf "@[<v 2>try%a@,%a@;<0 -2>with@,%a@;<0 -2>endtry@]"
              Printcmm.trywith_kind kind instr body instr handler
   | Iraise k ->
-      fprintf ppf "%s %a" (Lambda.raise_kind k) reg i.arg.(0)
+      fprintf ppf "%s %a" (Lambda.raise_kind k) operand i.operands.(0)
   end;
   if not (Debuginfo.is_none i.dbg) && !Clflags.locations then
     fprintf ppf "%s" (Debuginfo.to_string i.dbg);

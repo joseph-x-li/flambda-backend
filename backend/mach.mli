@@ -146,7 +146,13 @@ val copy
   -> instruction
   -> instruction
 
+(* [arg_reg i n] asserts that [i.operands.(n)] is [Ireg r] and return [r]. *)
 val arg_reg : instruction -> int -> Reg.t
+
+(* [arg_regs i] returns the set of registers used in instruction operands. *)
+val arg_regs : instruction -> Reg.Set.t
+
+val same_loc : operand -> Reg.t -> bool
 
 val dummy_instr: instruction
 val end_instr: unit -> instruction
@@ -167,3 +173,4 @@ val equal_integer_comparison : integer_comparison -> integer_comparison -> bool
 val equal_integer_operation : integer_operation -> integer_operation -> bool
 val equal_float_operation : float_operation -> float_operation -> bool
 
+val equal_operand : operand -> operand -> bool

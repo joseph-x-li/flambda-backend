@@ -136,9 +136,27 @@ let end_instr () =
   }
 
 let arg_reg i n =
-  match i.operand.(n) with
+  match i.operands.(n) with
   | Ireg r -> r
   | _ -> assert false
+
+let arg_regs i =
+  Array.fold_left (fun s -> function
+    | Iimm _ | Iimmf _ -> s
+    | Ireg r -> Reg.Set.add r s
+    | Imem (_,_,r) -> Reg.add_set_array s r)
+    Reg.Set.empty i.operands
+
+let same_loc operand reg =
+  match operand with
+  | Iimm _ | Iimmf _ -> false
+  | Imem _ ->
+    (* CR gyorsh: can be optimizeed if reg.loc is Stack and mem is
+       statically known to refer to the same stack location.
+       This case Will need to be handled if we replace the representation of
+       Reg.Stack to use Imem. *)
+    false
+  | Ireg r -> Reg.same_loc r reg
 
 let instr_cons d r o n =
   { desc = d; next = n; res = r; operands = o;
@@ -362,3 +380,14 @@ let equal_float_operation left right =
   | Imulf, Imulf -> true
   | Idivf, Idivf -> true
   | (Icompf _ | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf), _ -> false
+
+let equal_operand left right =
+  match left, right with
+  | Iimm left, Iimm right -> Int.equal left right
+  | Iimmf left, Iimmf right -> Int64.equal left right
+  | Ireg left, Ireg right -> Reg.same_loc left right
+  | Imem (chunk_left, addr_left, left), Imem (chunk_right, addr_right, right) ->
+    Cmm.equal_memory_chunk chunk_left chunk_right &&
+    Arch.equal_addressing_mode addr_left addr_right &&
+    array_equal Reg.same_loc left right
+  | (Iimm _ | Iimmf _ | Ireg _ | Imem _),_ -> false

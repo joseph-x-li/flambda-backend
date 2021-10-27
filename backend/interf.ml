@@ -144,9 +144,10 @@ let build_graph fundecl =
       let r = arg.(i) in r.spill_cost <- r.spill_cost + cost
     done in
 
-  let add_spill_cost_operands cost i =
-    for i = 0 to Array.length arg - 1 do
-      match operand.(i) with
+  let add_spill_cost_operands cost operands =
+    (* Explicitly iterate because order matters *)
+    for i = 0 to Array.length operands - 1 do
+      match operands.(i) with
       | Iimm _ | Iimmf _ -> ()
       | Ireg r -> r.spill_cost <- r.spill_cost + cost
       | Imem (_,_,r) -> add_spill_cost cost r
@@ -156,7 +157,7 @@ let build_graph fundecl =
 
   let rec prefer weight i =
     assert (weight > 0);
-    add_spill_cost weight i.operands;
+    add_spill_cost_operands weight i.operands;
     add_spill_cost weight i.res;
     match i.desc with
       Iend -> ()

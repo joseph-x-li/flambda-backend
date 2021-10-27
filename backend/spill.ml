@@ -182,7 +182,7 @@ let add_reloads env regset i =
     (fun r (env, i) ->
        let env, r' = spill_reg env r in
        env,
-       instr_cons (Iop Ireload) [|r'|] [|r|] [||] i)
+       instr_cons (Iop Ireload) [|r|] [|Ireg r'|] i)
     regset (env, i)
 
 let find_reload_at_exit env k =

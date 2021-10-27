@@ -80,15 +80,10 @@ let is_immediate operands ~index =
     false
 
 let is_stack arg operands ~index =
-  if Array.length operands > index then
     match operands.(index) with
     | Iimm _ | Iimmf _ -> false
-    | Ireg j -> stackp arg.(j)
+    | Ireg r -> stackp r
     | Imem _ -> assert false
-  else begin
-      assert (Array.length arg > index);
-      stackp arg.(index)
-    end
 
 let same_loc_arg0_res0 arg res operands =
   if Array.length operands > 0 then
@@ -102,20 +97,6 @@ let same_loc_arg0_res0 arg res operands =
 class reload = object (self)
 
 inherit Reloadgen.reload_generic as super
-
-(* If operand.(i) is a memory access, force any Reg.t it refers to
-   to be in reg, not on the stack. *)
-method private force_reg_for_mem_operands arg operands =
-  let arg = Array.copy arg in
-  (Array.iter (function
-     | Ireg _ | Iimm _ | Iimmf _ -> ()
-     | Imem (_,_, r) ->
-       Array.iter (fun j ->
-         if stackp arg.(j) then
-           arg.(j) <- self#makereg arg.(j))
-         r)
-     operands);
-  arg
 
 method private one_stack arg =
   if stackp arg.(0) && stackp arg.(1)
@@ -153,7 +134,7 @@ method private same_reg_res0_arg0 arg res operands =
     (arg, [|r|])
   end else (arg, res)
 
-method! reload_operation op arg res operands =
+method! reload_operation op res operands =
   let arg = self#force_reg_for_mem_operands arg operands in
   match op with
   | Iintop(Iadd) when (not (same_loc_arg0_res0 arg res operands))
@@ -232,23 +213,23 @@ method! reload_operation op arg res operands =
     -> (* Other operations: all args and results in registers *)
       super#reload_operation op arg res operands
 
-method! reload_test tst arg operands =
-  let arg = self#force_reg_for_mem_operands arg operands in
+method! reload_test tst operands =
+  let operands = self#makeregs_for_mem_operands operands in
   match tst with
-    Iinttest _ ->
-      (* One of the two arguments can reside on stack *)
+  | Iinttest _ ->
+      (* One of the two arguments can reside in memory or on stack *)
       self#one_mem_or_stack arg operands
   | Ifloattest (CFlt | CFnlt | CFle | CFnle | CFeq
                | CFneq | CFgt | CFngt | CFge | CFnge) ->
       (* Second argument can be on stack, first must be in register *)
-      if is_stack arg operands ~index:0 then arg.(0) <- self#makereg arg.(0);
-      arg
+      operands.(0) <- self#makereg_operand operands.(0);
+      operands
   | Itruetest
   | Ifalsetest
   | Ioddtest
   | Ieventest ->
       (* The argument(s) can be either in register or on stack *)
-      arg
+      operands
 
 end
 

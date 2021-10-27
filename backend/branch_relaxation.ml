@@ -67,18 +67,12 @@ module Make (T : Branch_relaxation_intf.S) = struct
         Misc.fatal_error "Unsupported instruction for branch relaxation"
 
   let fixup_branches ~code_size ~max_out_of_line_code_offset map code =
-    let expand_optbranch lbl n arg operands next =
+    let expand_optbranch lbl n operands next =
       match lbl with
       | None -> next
       | Some l ->
-        let new_operands =
-          match Array.length operands with
-          | 0 ->  [| Ireg 0; Iimm n; |]
-          | 1 ->  [| operands.(0); Iimm n; |]
-          | _ -> assert false
-        in
         instr_cons (Lcondbranch (Iinttest (Isigned Cmm.Ceq), l))
-          [| arg.(0) |] [||] new_operands next
+          [| operands.(0); Iimm n; |] next
     in
     let rec fixup did_fix pc instr =
       match instr.desc with
@@ -103,17 +97,17 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label() in
             let cont =
-              instr_cons (Lbranch lbl) [||] [||] [||]
-                (instr_cons (Llabel lbl2) [||] [||] [||] instr.next)
+              instr_cons (Lbranch lbl) [||] [||]
+                (instr_cons (Llabel lbl2) [||] [||] instr.next)
             in
             instr.desc <- Lcondbranch (invert_test test, lbl2);
             instr.next <- cont;
             fixup true (pc + T.instr_size instr.desc) instr.next
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
             let cont =
-              expand_optbranch lbl0 0 instr.arg instr.operands
-                (expand_optbranch lbl1 1 instr.arg instr.operands
-                  (expand_optbranch lbl2 2 instr.arg instr.operands instr.next))
+              expand_optbranch lbl0 0 instr.operands
+                (expand_optbranch lbl1 1 instr.operands
+                  (expand_optbranch lbl2 2 instr.operands instr.next))
             in
             instr.desc <- cont.desc;
             instr.next <- cont.next;

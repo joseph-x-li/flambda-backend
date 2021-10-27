@@ -278,7 +278,7 @@ let dump_terminator ppf ?(sep = "\n") ti =
             match (operand : Mach.operand) with
             | Iimm n -> Printf.sprintf "%s imm %d" cmp n
             | Iimmf f -> Printf.sprintf "%s immf %f" cmp (Int64.float_of_bits f)
-            | Ireg j -> Printf.sprintf "%s reg %d" cmp j
+            | Ireg j -> Printf.asprintf "%s reg %s" cmp Printmach.reg r
             | Imem _ -> Printf.sprintf "%s mem" cmp)
           cmp ti.operands
     in

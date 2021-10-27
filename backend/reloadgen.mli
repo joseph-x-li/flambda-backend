@@ -26,4 +26,13 @@ class reload_generic : object
        (i.e. if all "registers" of that class are actually on stack) *)
   method fundecl : Mach.fundecl -> int array -> Mach.fundecl * bool
     (* The entry point *)
+
+  (* The following methods should not be overridden.  They are provided
+     as utilities to be used in classes that inherit from reloadgen. *)
+  method makeregs_for_memory : Mach.operand array -> Mach.operand array
+     (*  Force all "registers" used by memory operands to be in hardware
+         registers, not on the stack. *)
+  method makeregs_operands : Mach.operand array -> Mach.operand array
+     (*  Force all "registers" referred to by the operands
+         to be in hardware registers, not on the stack. *)
 end

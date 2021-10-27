@@ -19,16 +19,43 @@ open Misc
 open Reg
 open Mach
 
+let operands rv = Array.map (fun r -> Ireg r) rv
+
 let insert_move src dst next =
   if src.loc = dst.loc
   then next
-  else instr_cons (Iop Imove) [|src|] [|dst|] [||] next
+  else instr_cons (Iop Imove) [|dst|] [|src|] next
 
 let insert_moves src dst next =
   let rec insmoves i =
     if i >= Array.length src
     then next
     else insert_move src.(i) dst.(i) (insmoves (i+1))
+  in insmoves 0
+
+let insert_moves_operands src dst next =
+  let rec insmoves i =
+    if i >= Array.length src
+    then next
+    else begin
+      (* CR gyorsh: the following assumes that target's reload can only
+         change the registers refered to by operands but not the shape
+         of operands. Later if we represent load and store using operands,
+         we can also generate move between  memory and register here. *)
+      match src.(i), dst.(i) with
+      | o, o' when Mach.equal_operand o o' -> insmoves (i+1)
+      | Ireg _, Ireg r -> insert_move src.(i) r (insmoves (i+1))
+      | Imem (c,a,rv), Imem (c',a',rv')
+        when Cmm.equal_chunks c c' &&
+             Arch.equal_addresing_mode a a' ->
+        insert_moves (operands rv) rv' (insmoves (i+1))
+      (* | (Imem _ | Iimm _ | Iimmf _), Ireg r when not (Reg.is_stack r) ->
+       *   insert_move src.(i) r (insmoves (i+1))
+       * | Ireg r, Imem _ when not (Reg.is_stack r) ->
+       *   insert_move src.(i) dst.(i) (insmoves (i+1)) *)
+      | (Ireg _ | Imem _ | Iimm _ | Iimmf _),  ->
+        Misc.fatal_errorf "Reloadgen.insert_moves_operands: mismatch %d" i ()
+    end
   in insmoves 0
 
 class reload_generic = object (self)
@@ -47,43 +74,66 @@ method makereg r =
       newr
 
 method private makeregs rv =
-  let n = Array.length rv in
-  let newv = Array.make n Reg.dummy in
-  for i = 0 to n-1 do newv.(i) <- self#makereg rv.(i) done;
+  Array.init (Array.length rv) (fun i -> self#makereg rv.(i))
+
+method makereg_operand o =
+  match o with
+  | Iimm _ | Iimmf _ -> o
+  | Ireg r -> Ireg (self#makereg r)
+  | Imem (c, a, rv) -> Imem (c, a, self#makeregs rv)
+
+method private makeregs_operands ov =
+  Array.init (Array.length ov) (fun i -> self#makereg_operand ov.(i))
+
+method private makereg1 ov =
+  let newv = Array.copy ov in
+  newv.(0) <- self#makereg_operand ov.(0);
   newv
 
-method private makereg1 rv =
-  let newv = Array.copy rv in
-  newv.(0) <- self#makereg rv.(0);
-  newv
+(* If operand.(i) is a memory access, force any Reg.t it refers to
+   to be in hardware reg, not on the stack. *)
+method makeregs_for_mem_operands operands =
+  Array.map (fun operand ->
+    match operand with
+    | Ireg _ | Iimm _ | Iimmf _ -> operand
+    | Imem (c,a,rv) -> Imem (c,a,self#makeregs rv))
+    operands;
 
-method reload_operation op arg res operands =
+method reload_operation op res operands =
+  let operands = self#makeregs_for_mem_operands operands in
   (* By default, assume that arguments and results must reside
      in hardware registers. For moves, allow one arg or one
      res to be stack-allocated, but do something for
      stack-to-stack moves *)
   match op with
-    Imove | Ireload | Ispill ->
-      begin match arg.(0), res.(0) with
-        {loc = Stack s1}, {loc = Stack s2} when s1 <> s2 ->
-          ([| self#makereg arg.(0) |], res)
+  | Imove | Ireload | Ispill ->
+    begin match operands.(0) with
+    | Ireg r ->
+      begin match r.loc, res.(0).loc with
+      |  Stack s1, Stack s2 when s1 <> s2 ->
+        ([| Ireg self#makereg r |], res)
       | _ ->
-          (arg, res)
+        (operands, res)
       end
+    | Iimm _ | Iimmf _ -> (operands, res)
+    | Imem _ ->
+      Misc.fatal_errorf "Reloadgen.reload_operation: \
+                         Imove from memory not supported, use Istore."
+    end
   | Iprobe _ ->
     (* No constraints on where the arguments reside,
        so that the presence of a probe does not affect
        register allocation of the rest of the code. *)
-    (arg, res)
+    (operands, res)
   | Iopaque ->
       (* arg = result, can be on stack or register *)
-      assert (arg.(0).stamp = res.(0).stamp);
-      (arg, res)
+      assert (Mach.arg_reg operands.(0).stamp = res.(0).stamp);
+      (operands, res)
   | _ ->
-      (self#makeregs arg, self#makeregs res)
+      (self#makeregs_operands operands, self#makeregs res)
 
-method reload_test _tst args operands =
-  self#makeregs args
+method reload_test _tst operands =
+  self#makeregs_operands operands
 
 method private reload i k =
   match i.desc with
@@ -93,36 +143,36 @@ method private reload i k =
        indirect calls. *)
     Iend | Ireturn _ | Iop(Itailcall_imm _) | Iraise _ -> k i
   | Iop(Itailcall_ind) ->
-      let newarg = self#makereg1 i.arg in
-      k (insert_moves i.arg newarg
-           (Mach.copy i ~arg:newarg))
+      let newarg = self#makereg1 i.operands in
+      k (insert_moves_operands i.operands newarg
+           (Mach.copy i ~operands:newarg))
   | Iop(Icall_imm _ | Iextcall _) ->
       self#reload i.next (fun next -> k (Mach.copy i ~next))
   | Iop(Icall_ind) ->
-      let newarg = self#makereg1 i.arg in
+      let newarg = self#makereg1 i.operands in
       self#reload i.next (fun next ->
-        k (insert_moves i.arg newarg
-             (Mach.copy i ~arg:newarg ~next)))
+        k (insert_moves_operands i.operands newarg
+             (Mach.copy i ~operands:newarg ~next)))
   | Iop op ->
-      let (newarg, newres) = self#reload_operation op i.arg i.res i.operands in
+      let (newarg, newres) = self#reload_operation op i.res i.operands in
       self#reload i.next (fun next ->
-        k (insert_moves i.arg newarg
-             (Mach.copy i ~arg:newarg ~res:newres
-                     ~next:(insert_moves newres i.res next))))
+        k (insert_moves_operands i.operands newarg
+             (Mach.copy i ~operands:newarg ~res:newres
+                     ~next:(insert_moves (operands newres) i.res next))))
   | Iifthenelse(tst, ifso, ifnot) ->
-      let newarg = self#reload_test tst i.arg i.operands in
+      let newarg = self#reload_test tst i.operands in
       self#reload ifso (fun ifso ->
         self#reload ifnot (fun ifnot ->
           self#reload i.next (fun next ->
-            k (insert_moves i.arg newarg
+            k (insert_moves_operands i.operands newarg
                  (instr_cons (Iifthenelse(tst, ifso, ifnot))
                     newarg [||] i.operands next)))))
   | Iswitch(index, cases) ->
-      let newarg = self#makeregs i.arg in
+      let newarg = self#makeregs_operands i.operand in
       let cases = Array.map (fun case -> self#reload case Fun.id) cases in
       self#reload i.next (fun next ->
-        k (insert_moves i.arg newarg
-             (instr_cons (Iswitch(index, cases)) newarg [||] i.operands next)))
+        k (insert_moves_operands i.operands newarg
+             (instr_cons (Iswitch(index, cases)) [||] newarg next)))
   | Icatch(rec_flag, ts, handlers, body) ->
       let new_handlers = List.map
           (fun (nfail, ts, handler) -> nfail, ts, self#reload handler Fun.id)
@@ -130,15 +180,15 @@ method private reload i k =
       self#reload body (fun body ->
         self#reload i.next (fun next ->
           k (instr_cons (Icatch(rec_flag, ts, new_handlers, body))
-               [||] [||] [||] next)))
+               [||] [||] next)))
   | Iexit (i, traps) ->
-      k (instr_cons (Iexit (i, traps)) [||] [||] [||] dummy_instr)
+      k (instr_cons (Iexit (i, traps)) [||] [||] dummy_instr)
   | Itrywith(body, kind, (ts, handler)) ->
       self#reload body (fun body ->
         self#reload handler (fun handler ->
           self#reload i.next (fun next ->
             k (instr_cons (Itrywith(body, kind, (ts, handler)))
-                 [||] [||] [||] next))))
+                 [||] [||] next))))
 
 method fundecl f num_stack_slots =
   redo_regalloc <- false;
