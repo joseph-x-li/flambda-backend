@@ -103,26 +103,18 @@ method private one_stack arg =
   then [|arg.(0); self#makereg arg.(1)|]
   else arg
 
-method private one_mem_or_stack arg operands =
-  match Array.length operands with
-  | 0 ->
-    self#one_stack arg
-  | n ->
-     match operands.(0), operands.(1) with
-     | Iimm _, _ | _, Iimm _ -> arg
-     | Ireg _, Ireg _ -> self#one_stack arg
-     | Iimmf _, Ireg j | Ireg j, Iimmf _ ->
-         (* float immediate is implemented as a memory load *)
-         if stackp arg.(j) then
-           arg.(j) <- self#makereg arg.(j);
-         arg
-     | Iimmf _, _ | _, Iimmf _
-     | Imem _, Imem _ -> assert false
-     | Imem (_,_,r), Ireg j | Ireg j, Imem (_,_,r) ->
-         assert (Array.for_all (fun i -> not (stackp arg.(i))) r);
-         if stackp arg.(j) then
-           arg.(j) <- self#makereg arg.(j);
-         arg
+method private one_mem_or_stack operands =
+  (* First operand must be Ireg *)
+  if (Reg.is_stack (Mach.arg_reg operands.(0))) then
+    match operands.(1) with
+    | Ireg r' when Reg.is_stack r' ->
+      [| operand.(0); Ireg (self#makereg r') |]
+    | Ireg _ | Iimm _ -> operands
+    | Iimmf _  (* float immediate is implemented as a memory load *)
+    | Imem _ ->
+      [| Ireg (self#makereg r); operand.(1) |]
+  else
+    operands
 
 (* First argument (= result) must be in register, second arg
          can reside in the stack or memory or immediate *)
@@ -137,21 +129,21 @@ method private same_reg_res0_arg0 arg res operands =
 method! reload_operation op res operands =
   let arg = self#force_reg_for_mem_operands arg operands in
   match op with
-  | Iintop(Iadd) when (not (same_loc_arg0_res0 arg res operands))
+  | Iintop(Iadd) when (not (Reg.same_loc (Mach.arg_reg operand.(0)) res.(0)))
                       && is_immediate operands ~index:1 ->
       (* This add will be turned into a lea; args and results must be
          in registers *)
-      super#reload_operation op arg res operands
+      super#reload_operation op res operands
   | Iintop(Iadd|Isub|Iand|Ior|Ixor|Icheckbound) ->
       (* One of the two arguments can reside in the stack or memory, but not both *)
-      (self#one_mem_or_stack arg operands, res)
+      (self#one_mem_or_stack operands, res)
   | Iintop (Icomp _) ->
       (* One of the two arguments can reside in the stack, but not both.
          The result must be in a register. *)
       let res =
         if stackp res.(0) then [| self#makereg res.(0) |] else res
       in
-      (self#one_mem_or_stack arg operands, res)
+      (self#one_mem_or_stack operands, res)
   | Ispecific Ifloat_iround
   | Ispecific (Ifloat_round _) ->
       (* The argument(s) can be either in register or on stack.
