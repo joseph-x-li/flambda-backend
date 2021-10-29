@@ -24,7 +24,7 @@ let operands rv = Array.map (fun r -> Ireg r) rv
 let insert_move src dst next =
   if src.loc = dst.loc
   then next
-  else instr_cons (Iop Imove) [|dst|] [|src|] next
+  else instr_cons (Iop Imove) [|dst|] [|Ireg src|] next
 
 let insert_moves src dst next =
   let rec insmoves i =
@@ -44,7 +44,7 @@ let insert_moves_operands src dst next =
          we can also generate move between  memory and register here. *)
       match src.(i), dst.(i) with
       | o, o' when Mach.equal_operand o o' -> insmoves (i+1)
-      | Ireg _, Ireg r -> insert_move src.(i) r (insmoves (i+1))
+      | Ireg r_src, Ireg r_dst -> insert_move r_src r_dst (insmoves (i+1))
       | Imem (c,a,rv), Imem (c',a',rv')
         when Cmm.equal_chunks c c' &&
              Arch.equal_addresing_mode a a' ->
@@ -53,7 +53,7 @@ let insert_moves_operands src dst next =
        *   insert_move src.(i) r (insmoves (i+1))
        * | Ireg r, Imem _ when not (Reg.is_stack r) ->
        *   insert_move src.(i) dst.(i) (insmoves (i+1)) *)
-      | (Ireg _ | Imem _ | Iimm _ | Iimmf _),  ->
+      | (Ireg _ | Imem _ | Iimm _ | Iimmf _),_  ->
         Misc.fatal_errorf "Reloadgen.insert_moves_operands: mismatch %d" i ()
     end
   in insmoves 0
@@ -111,7 +111,7 @@ method reload_operation op res operands =
     | Ireg r ->
       begin match r.loc, res.(0).loc with
       |  Stack s1, Stack s2 when s1 <> s2 ->
-        ([| Ireg self#makereg r |], res)
+        ([| Ireg (self#makereg r) |], res)
       | _ ->
         (operands, res)
       end

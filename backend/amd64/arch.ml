@@ -189,39 +189,42 @@ let print_specific_operation_name op =
   | Icrc32q -> "crc32"
   | Iprefetch _ -> "prefetch"
 
-let print_specific_operation printreg op ppf arg =
+let print_specific_operation printreg printoperand op ppf arg =
   match op with
   | Ilea addr -> print_addressing printreg addr ppf arg
   | Istore_int(n, addr, is_assign) ->
       fprintf ppf "[%a] := %nd %s"
-         (print_addressing printreg addr) arg n
+         (print_addressing printreg addr) (Array.map Mach.arg_reg arg) n
          (if is_assign then "(assign)" else "(init)")
   | Ioffset_loc(n, addr) ->
-      fprintf ppf "[%a] +:= %i" (print_addressing printreg addr) arg n
+      fprintf ppf "[%a] +:= %i" (print_addressing printreg addr)
+        (Array.map Mach.arg_reg arg)  n
   | Isqrtf ->
-      fprintf ppf "sqrtf %a" printreg arg.(0)
-  | Ifloat_iround -> fprintf ppf "float_iround %a" printreg arg.(0)
+      fprintf ppf "sqrtf %a" printoperand arg.(0)
+  | Ifloat_iround -> fprintf ppf "float_iround %a" printoperand arg.(0)
   | Ifloat_round mode ->
      fprintf ppf "float_round %s %a" (string_of_rounding_mode mode)
-       printreg arg.(0)
-  | Ifloat_min -> fprintf ppf "float_min %a %a" printreg arg.(0) printreg arg.(1)
-  | Ifloat_max -> fprintf ppf "float_max %a %a" printreg arg.(0) printreg arg.(1)
+       printoperand arg.(0)
+  | Ifloat_min -> fprintf ppf "float_min %a %a"
+                    printoperand arg.(0) printoperand arg.(1)
+  | Ifloat_max -> fprintf ppf "float_max %a %a"
+                    printoperand arg.(0) printoperand arg.(1)
   | Ibswap i ->
-      fprintf ppf "bswap_%i %a" i printreg arg.(0)
+      fprintf ppf "bswap_%i %a" i printoperand arg.(0)
   | Isextend32 ->
-      fprintf ppf "sextend32 %a" printreg arg.(0)
+      fprintf ppf "sextend32 %a" printoperand arg.(0)
   | Izextend32 ->
-      fprintf ppf "zextend32 %a" printreg arg.(0)
+      fprintf ppf "zextend32 %a" printoperand arg.(0)
   | Irdtsc ->
       fprintf ppf "rdtsc"
   | Irdpmc ->
-      fprintf ppf "rdpmc %a" printreg arg.(0)
+      fprintf ppf "rdpmc %a" printoperand arg.(0)
   | Icrc32q ->
-      fprintf ppf "crc32 %a %a" printreg arg.(0) printreg arg.(1)
+      fprintf ppf "crc32 %a %a" printoperand arg.(0) printoperand arg.(1)
   | Iprefetch { is_write; locality; } ->
       fprintf ppf "prefetch is_write=%b prefetch_temporal_locality_hint=%s %a"
         is_write (string_of_prefetch_temporal_locality_hint locality)
-        printreg arg.(0)
+        printoperand arg.(0)
 
 let win64 =
   match Config.system with

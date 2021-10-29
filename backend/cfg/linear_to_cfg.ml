@@ -107,7 +107,6 @@ let get_new_linear_id t =
 let create_instruction t desc ~trap_depth (i : Linear.instruction) :
     _ C.instruction =
   { desc;
-    arg = i.arg;
     res = i.res;
     operands = i.operands;
     dbg = i.dbg;

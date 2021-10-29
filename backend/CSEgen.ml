@@ -206,10 +206,10 @@ let insert_single_move i src dst = instr_cons (Iop Imove) [|dst|] [|src|] i
 let insert_move srcs dsts i =
   match Array.length srcs with
   | 0 -> i
-  | 1 -> instr_cons (Iop Imove) srcs dsts i
+  | 1 -> instr_cons (Iop Imove) dsts srcs i
   | _ -> (* Parallel move: first copy srcs into tmps one by one,
             then copy tmps into dsts one by one *)
-         let tmps = Reg.createv_like srcs in
+         let tmps = Reg.createv_like dsts in
          let tmp_operands = Array.map (fun r -> Ireg r) tmps in
          let i1 = array_fold2 insert_single_move i tmp_operands dsts in
          array_fold2 insert_single_move i1 srcs tmps
@@ -281,7 +281,7 @@ method private cse n i k =
   | Iop (Imove | Ispill | Ireload) ->
       (* For moves, we associate the same value number to the result reg
          as to the argument reg. *)
-      let n1 = set_move n i.arg.(0) i.res.(0) in
+      let n1 = set_move n i.operands.(0) i.res.(0) in
       self#cse n1 i.next (fun next -> k (Mach.copy i ~next))
   | Iop (Icall_ind | Icall_imm _ | Iextcall _ | Iprobe _) ->
       (* For function calls and probes, we should at least forget:

@@ -348,7 +348,7 @@ let check_instruction :
   (* CR xclerc for xclerc: double check whether `Reg.same_loc` is enough. (note:
      `Reg.Set.equal` uses the `stamp` fields) *)
   if check_arg
-     && not (array_equal equal_operand expected.operands result.operands)
+     && not (array_equal Mach.equal_operand expected.operands result.operands)
   then different location "input operands";
   if not (array_equal Reg.same_loc expected.res result.res)
   then different location "output registers";

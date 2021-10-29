@@ -79,13 +79,13 @@ let is_immediate operands ~index =
   else
     false
 
-let is_stack arg operands ~index =
+let is_stack operands ~index =
     match operands.(index) with
     | Iimm _ | Iimmf _ -> false
     | Ireg r -> stackp r
     | Imem _ -> assert false
 
-let same_loc_arg0_res0 arg res operands =
+let same_loc_arg0_res0 res operands =
   if Array.length operands > 0 then
     match operands.(0) with
     | Ireg j -> Reg.same_loc arg.(j) res.(0)

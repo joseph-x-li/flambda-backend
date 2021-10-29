@@ -57,7 +57,7 @@ let operand ppf = function
     fprintf ppf "mem %s[%a]" (Printcmm.chunk c)
       (Arch.print_addressing reg a) r
 
-let operands arg ppf v =
+let operands ppf v =
   match Array.length v with
   | 0 -> ()
   | 1 -> operand ppf v.(0)
@@ -135,87 +135,83 @@ let floatop = function
 
 let test tst ops ppf arg =
   match tst with
-  | Itruetest -> reg ppf arg.(0)
-  | Ifalsetest -> fprintf ppf "not %a" reg arg.(0)
+  | Itruetest -> operand ppf arg.(0)
+  | Ifalsetest -> fprintf ppf "not %a" operand arg.(0)
   | Iinttest cmp ->
       if Array.length ops = 0 then begin
         assert (Array.length arg = 2);
-        fprintf ppf "%a%s%a" reg arg.(0) (intcomp cmp) reg arg.(1)
+        fprintf ppf "%a%s%a" operand arg.(0) (intcomp cmp) operand arg.(1)
       end else begin
-        fprintf ppf "%s (%a)" (intcomp cmp) (operands arg) ops;
+        fprintf ppf "%s (%a)" (intcomp cmp) operands ops;
       end
   | Ifloattest cmp ->
       fprintf ppf "%a%s%a"
-       reg arg.(0) (floatcomp cmp) reg arg.(1)
-  | Ieventest -> fprintf ppf "%a & 1 == 0" reg arg.(0)
-  | Ioddtest -> fprintf ppf "%a & 1 == 1" reg arg.(0)
+       operand arg.(0) (floatcomp cmp) operand arg.(1)
+  | Ieventest -> fprintf ppf "%a & 1 == 0" operand arg.(0)
+  | Ioddtest -> fprintf ppf "%a & 1 == 1" operand arg.(0)
 
-let operation op arg ppf res ops =
+let operation op ppf res arg =
   if Array.length res > 0 then fprintf ppf "%a := " regs res;
-  if Array.length ops > 0 then fprintf ppf "(%a) " (operands arg) ops;
   match op with
-  | Imove -> regs ppf arg
-  | Ispill -> fprintf ppf "%a (spill)" regs arg
-  | Ireload -> fprintf ppf "%a (reload)" regs arg
+  | Imove -> operands ppf arg
+  | Ispill -> fprintf ppf "%a (spill)" operands arg
+  | Ireload -> fprintf ppf "%a (reload)" operands arg
   | Iconst_int n -> fprintf ppf "%s" (Nativeint.to_string n)
   | Iconst_float f -> fprintf ppf "%F" (Int64.float_of_bits f)
   | Iconst_symbol s -> fprintf ppf "\"%s\"" s
-  | Icall_ind -> fprintf ppf "call %a" regs arg
-  | Icall_imm { func; } -> fprintf ppf "call \"%s\" %a" func regs arg
-  | Itailcall_ind -> fprintf ppf "tailcall %a" regs arg
-  | Itailcall_imm { func; } -> fprintf ppf "tailcall \"%s\" %a" func regs arg
+  | Icall_ind -> fprintf ppf "call %a" operands arg
+  | Icall_imm { func; } -> fprintf ppf "call \"%s\" %a" func operands arg
+  | Itailcall_ind -> fprintf ppf "tailcall %a" operands arg
+  | Itailcall_imm { func; } -> fprintf ppf "tailcall \"%s\" %a" func operands arg
   | Iextcall { func; alloc; _ } ->
-      fprintf ppf "extcall \"%s\" %a%s" func regs arg
+      fprintf ppf "extcall \"%s\" %a%s" func operands arg
       (if alloc then "" else " (noalloc)")
   | Istackoffset n ->
       fprintf ppf "offset stack %i" n
   | Iload(chunk, addr) ->
       fprintf ppf "%s[%a]"
-       (Printcmm.chunk chunk) (Arch.print_addressing reg addr) arg
+       (Printcmm.chunk chunk) (Arch.print_addressing reg addr)
+       (Array.map Mach.arg_reg arg)
   | Istore(chunk, addr, is_assign) ->
       fprintf ppf "%s[%a] := %a %s"
        (Printcmm.chunk chunk)
        (Arch.print_addressing reg addr)
-       (Array.sub arg 1 (Array.length arg - 1))
-       reg arg.(0)
+       (Array.map Mach.arg_reg (Array.sub arg 1 (Array.length arg - 1)))
+       operand arg.(0)
        (if is_assign then "(assign)" else "(init)")
   | Ialloc { bytes = n; } ->
     fprintf ppf "alloc %i" n;
   | Iintop(op) ->
-     if Array.length ops = 0 then begin
-         if is_unary_op op then begin
-             assert (Array.length arg = 1);
-             fprintf ppf "%s%a" (intop op) reg arg.(0)
-           end else begin
-             assert (Array.length arg = 2);
-             fprintf ppf "%a%s%a" reg arg.(0) (intop op) reg arg.(1)
-           end
-       end else begin
-         fprintf ppf "%s " (intop op)
-       end
+    if is_unary_op op then begin
+      assert (Array.length arg = 1);
+      fprintf ppf "%s%a" (intop op) operand arg.(0)
+    end else begin
+      assert (Array.length arg = 2);
+      fprintf ppf "%a%s%a" operand arg.(0) (intop op) operand arg.(1)
+    end
   | Ifloatop(op) ->
      if is_unary_floatop op then
        begin
         assert (Array.length arg = 1);
-        fprintf ppf "%s%a" (floatop op) reg arg.(0)
+        fprintf ppf "%s%a" (floatop op) operand arg.(0)
       end else begin
         assert (Array.length arg > 1);
-        fprintf ppf "%a%s%a" reg arg.(0) (floatop op) reg arg.(1)
+        fprintf ppf "%a%s%a" operand arg.(0) (floatop op) operand arg.(1)
       end
-  | Ifloatofint -> fprintf ppf "floatofint %a" reg arg.(0)
-  | Iintoffloat -> fprintf ppf "intoffloat %a" reg arg.(0)
-  | Iopaque -> fprintf ppf "opaque %a" reg arg.(0)
+  | Ifloatofint -> fprintf ppf "floatofint %a" operand arg.(0)
+  | Iintoffloat -> fprintf ppf "intoffloat %a" operand arg.(0)
+  | Iopaque -> fprintf ppf "opaque %a" operand arg.(0)
   | Iname_for_debugger { ident; which_parameter; } ->
     fprintf ppf "name_for_debugger %a%s=%a"
       V.print ident
       (match which_parameter with
         | None -> ""
         | Some index -> sprintf "[P%d]" index)
-      reg arg.(0)
+      operand arg.(0)
   | Ispecific op ->
-      Arch.print_specific_operation reg op ppf arg
+      Arch.print_specific_operation reg operand op ppf arg
   | Iprobe {name;handler_code_sym} ->
-    fprintf ppf "probe \"%s\" %s %a" name handler_code_sym regs arg
+    fprintf ppf "probe \"%s\" %s %a" name handler_code_sym operands arg
   | Iprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled \"%s\"" name
 
 let rec instr ppf i =
@@ -239,7 +235,7 @@ let rec instr ppf i =
   | Iop op ->
       operation op i.operands ppf i.res
   | Ireturn traps ->
-      fprintf ppf "return%a %a" Printcmm.trap_action_list traps regs i.operands
+      fprintf ppf "return%a %a" Printcmm.trap_action_list traps operands i.operands
   | Iifthenelse(tst, ifso, ifnot) ->
       fprintf ppf "@[<v 2>if %a then@,%a" (test tst i.operands) i.operands instr ifso;
       begin match ifnot.desc with

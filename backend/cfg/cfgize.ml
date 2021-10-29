@@ -251,9 +251,8 @@ let copy_instruction :
     State.t -> Mach.instruction -> desc:a -> trap_depth:int -> a Cfg.instruction
     =
  fun state instr ~desc ~trap_depth ->
-  let { Mach.arg;
+  let { Mach.operands;
         res;
-        operands;
         dbg;
         live;
         desc = _;

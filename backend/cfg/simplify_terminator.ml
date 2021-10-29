@@ -46,11 +46,7 @@ let simplify_switch (block : C.basic_block) labels =
       labels []
   in
   let operands : int -> Mach.operand array =
-   fun imm ->
-    match Array.length block.terminator.operands with
-    | 0 -> [| Mach.Ireg 0; Iimm imm |]
-    | 1 -> [| block.terminator.operands.(0); Iimm imm |]
-    | _ -> assert false
+   fun imm -> [| block.terminator.operands.(0); Iimm imm |]
   in
   match labels_with_counts with
   | [(l, _)] ->

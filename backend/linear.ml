@@ -20,7 +20,6 @@ type label = Cmm.label
 type instruction =
   { mutable desc: instruction_desc;
     mutable next: instruction;
-    arg: Reg.t array;
     res: Reg.t array;
     operands: Mach.operand array;
     dbg: Debuginfo.t;
@@ -80,7 +79,6 @@ let invert_test = function
 let rec end_instr =
   { desc = Lend;
     next = end_instr;
-    arg = [||];
     res = [||];
     operands = [||];
     dbg = Debuginfo.none;
@@ -89,6 +87,6 @@ let rec end_instr =
 
 (* Cons an instruction (live, debug empty) *)
 
-let instr_cons d a r o n =
-  { desc = d; next = n; arg = a; res = r; operands = o;
+let instr_cons d r o n =
+  { desc = d; next = n; res = r; operands = o;
     dbg = Debuginfo.none; fdo = Fdo_info.none; live = Reg.Set.empty }

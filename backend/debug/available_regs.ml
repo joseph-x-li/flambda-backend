@@ -79,7 +79,7 @@ let check_invariants (instr : M.instruction) ~(avail_before : RAS.t) =
     end;
     (* Every register that is an input to an instruction should be
        available. *)
-    let args = Mach.arg_regs instr in
+    let args = Mach.arg_regset instr in
     let avail_before_fdi = RD.Set.forget_debug_info avail_before in
     if not (R.Set.subset args avail_before_fdi) then begin
       Misc.fatal_errorf "Instruction has unavailable input register(s): \
@@ -179,7 +179,7 @@ let rec available_regs (instr : M.instruction)
             let res = instr.res.(i) in
             (* Note that the register classes must be the same, so we don't
                 need to check that. *)
-            if not (Mach.same_loc arg <> res) then begin
+            if not (Mach.same_loc arg res) then begin
               move_to_same_location := false
             end
           done;

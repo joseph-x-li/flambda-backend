@@ -135,12 +135,17 @@ let end_instr () =
     available_across = None;
   }
 
-let arg_reg i n =
-  match i.operands.(n) with
+let arg_reg operand =
+  match operand with
   | Ireg r -> r
   | _ -> assert false
 
-let arg_regs i =
+(* let arg_reg i n =
+ *   match i.operands.(n) with
+ *   | Ireg r -> r
+ *   | _ -> assert false *)
+
+let arg_regset i =
   Array.fold_left (fun s -> function
     | Iimm _ | Iimmf _ -> s
     | Ireg r -> Reg.Set.add r s
@@ -389,5 +394,6 @@ let equal_operand left right =
   | Imem (chunk_left, addr_left, left), Imem (chunk_right, addr_right, right) ->
     Cmm.equal_memory_chunk chunk_left chunk_right &&
     Arch.equal_addressing_mode addr_left addr_right &&
-    array_equal Reg.same_loc left right
+    Array.length left = Array.length right &&
+    Array.for_all2 Reg.same_loc left right
   | (Iimm _ | Iimmf _ | Ireg _ | Imem _),_ -> false

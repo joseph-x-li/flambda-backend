@@ -88,7 +88,7 @@ let build_graph fundecl =
       Iend -> ()
     | Ireturn _ -> ()
     | Iop(Imove | Ispill | Ireload) ->
-        add_interf_move (Mach.arg_reg i 0) i.res.(0) i.live;
+        add_interf_move (Mach.arg_reg i.operand.(0)) i.res.(0) i.live;
         interf i.next
     | Iop(Itailcall_ind) -> ()
     | Iop(Itailcall_imm _) -> ()

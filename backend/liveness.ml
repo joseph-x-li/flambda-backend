@@ -98,13 +98,13 @@ let rec live env i finally =
       finally
   | Ireturn _ | Iop(Itailcall_ind) | Iop(Itailcall_imm _) ->
       Mach.update i ~live:Reg.Set.empty; (* no regs are live across *)
-      Mach.arg_regs i
+      Mach.arg_regset i
   | Iop op ->
       let after = live env i.next finally in
       if Proc.op_is_pure op                    (* no side effects *)
       && Reg.disjoint_set_array after i.res    (* results are not used after *)
       && not (Proc.regs_are_volatile
-                (Mach.arg_regs i
+                (Mach.arg_regset i
                  |> Reg.Set.elements
                  |> Array.of_list))            (* no stack-like hard reg *)
       && not (Proc.regs_are_volatile i.res)    (*            is involved *)
@@ -132,7 +132,7 @@ let rec live env i finally =
            | _ ->
                across_after in
         Mach.update i ~live:across;
-        Reg.Set.union across (Mach.arg_regs i)
+        Reg.Set.union across (Mach.arg_regset i)
       end
   | Iifthenelse(_test, ifso, ifnot) ->
       let at_join = live env i.next finally in
@@ -140,7 +140,7 @@ let rec live env i finally =
         Reg.Set.union (live env ifso at_join) (live env ifnot at_join)
       in
       Mach.update i ~live:at_fork;
-      Reg.Set.union at_fork (Mach.arg_regs i)
+      Reg.Set.union at_fork (Mach.arg_regset i)
   | Iswitch(_index, cases) ->
       let at_join = live env i.next finally in
       let at_fork = ref Reg.Set.empty in
@@ -148,7 +148,7 @@ let rec live env i finally =
         at_fork := Reg.Set.union !at_fork (live env cases.(i) at_join)
       done;
       Mach.update i ~live:!at_fork;
-      Reg.Set.union !at_fork (Mach.arg_regs i)
+      Reg.Set.union !at_fork (Mach.arg_regset i)
   | Icatch(rec_flag, ts, handlers, body) ->
       let at_join = live (env_from_trap_stack env ts) i.next finally in
       let aux env (nfail, ts, handler) (nfail', before_handler) =
@@ -227,7 +227,7 @@ let rec live env i finally =
       before_body
   | Iraise _ ->
       Mach.update i ~live:env.at_raise;
-      Reg.Set.union env.at_raise (Mach.arg_regs i)
+      Reg.Set.union env.at_raise (Mach.arg_regset i)
 
 let fundecl f =
   reset_cache ();

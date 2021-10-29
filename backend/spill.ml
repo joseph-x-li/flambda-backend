@@ -111,14 +111,14 @@ let spill_reg env r =
     { env with spill_env = Reg.Map.add r spill_r env.spill_env; },
     spill_r
 
-let record_use env regv =
-  let use_date = Array.fold_left (fun use_date r ->
+let record_use env regset =
+  let use_date = Reg.Set.fold_left (fun r use_date ->
       let prev_date = try Reg.Map.find r use_date with Not_found -> 0 in
       if env.current_date > prev_date then
         Reg.Map.add r env.current_date use_date
       else
         use_date)
-    env.use_date regv
+    env.use_date regset
   in
   { env with use_date; }
 
@@ -203,8 +203,8 @@ let find_in_reload_cache nfail env =
 
 let rec reload env i before =
   let env = { env with current_date = succ env.current_date; } in
-  let env = record_use env i.arg in
-  let env = record_use env i.res in
+  let env = record_use env i.operands in
+  let env = record_use env Reg.set_of_array i.res in
   match i.desc with
     Iend ->
       (i, before, env)

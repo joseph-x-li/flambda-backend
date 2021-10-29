@@ -90,7 +90,8 @@ let merge_substs sub1 sub2 i =
   | (Some _, None) -> sub1
   | (None, Some _) -> sub2
   | (Some s1, Some s2) ->
-      Reg.Set.iter (identify_sub s1 s2) (Reg.add_set_array i.live i.arg);
+      let s = Reg.Set.union i.live (Mach.arg_regset i) in
+      Reg.Set.iter (identify_sub s1 s2) s;
       sub1
 
 (* Same, for N substitutions *)

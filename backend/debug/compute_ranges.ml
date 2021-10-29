@@ -325,7 +325,6 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
         let label_insn : L.instruction =
           { desc = Llabel label;
             next = insn;
-            arg = [| |];
             res = [| |];
             operands = [| |];
             dbg = insn.dbg;

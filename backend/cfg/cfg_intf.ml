@@ -115,7 +115,6 @@ module S = struct
 
   type 'a instruction =
     { desc : 'a;
-      arg : Reg.t array;
       res : Reg.t array;
       operands : Mach.operand array;
       dbg : Debuginfo.t;
