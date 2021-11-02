@@ -25,7 +25,7 @@ val operand: formatter -> Mach.operand -> unit
 val operands: formatter -> Mach.operand array -> unit
 val operation: Mach.operation -> formatter -> Reg.t array
                -> Mach.operand array -> unit
-val test: Mach.test -> Mach.operand array -> formatter -> Reg.t array -> unit
+val test: Mach.test -> formatter -> Mach.operand array -> unit
 val instr: formatter -> Mach.instruction -> unit
 val fundecl: formatter -> Mach.fundecl -> unit
 val phase: string -> formatter -> Mach.fundecl -> unit

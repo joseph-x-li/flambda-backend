@@ -41,7 +41,7 @@ let subst_reg_in_operand o (sub : subst) =
   match o with
   | Ireg r -> Ireg (subst_reg r sub)
   | Iimm _ | Iimmf _ -> o
-  | Imem (c,a,rv) -> Imem (c,ar,subst_reg rv sub)
+  | Imem (c,a,rv) -> Imem (c,a,subst_reg rv sub)
 
 let subst_regs_in_operands v sub =
   match sub with

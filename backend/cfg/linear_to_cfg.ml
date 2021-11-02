@@ -392,7 +392,7 @@ let to_basic (mop : Mach.operation) : C.basic =
   | Iprobe_is_enabled { name } -> Op (Probe_is_enabled { name })
   | Istackoffset i -> Op (Stackoffset i)
   | Iload (c, a) -> Op (Load (c, a))
-  | Istore (c, a, b) -> Op (Store (c, a, b))
+  | Istore b -> Op (Store b)
   | Imove -> Op Move
   | Ispill -> Op Spill
   | Ireload -> Op Reload

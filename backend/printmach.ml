@@ -133,7 +133,7 @@ let floatop = function
   | Idivf -> " /f "
   | Icompf cmp -> floatcomp cmp
 
-let test tst ops ppf arg =
+let test tst ppf arg =
   match tst with
   | Itruetest -> operand ppf arg.(0)
   | Ifalsetest -> fprintf ppf "not %a" operand arg.(0)
@@ -172,12 +172,8 @@ let operation op ppf res arg =
       fprintf ppf "%s[%a]"
        (Printcmm.chunk chunk) (Arch.print_addressing reg addr)
        (Array.map Mach.arg_reg arg)
-  | Istore(chunk, addr, is_assign) ->
-      fprintf ppf "%s[%a] := %a %s"
-       (Printcmm.chunk chunk)
-       (Arch.print_addressing reg addr)
-       (Array.map Mach.arg_reg (Array.sub arg 1 (Array.length arg - 1)))
-       operand arg.(0)
+  | Istore is_assign ->
+      fprintf ppf "%s[%a] := %a %s" operand arg.(1) operand arg.(0)
        (if is_assign then "(assign)" else "(init)")
   | Ialloc { bytes = n; } ->
     fprintf ppf "alloc %i" n;
@@ -237,7 +233,7 @@ let rec instr ppf i =
   | Ireturn traps ->
       fprintf ppf "return%a %a" Printcmm.trap_action_list traps operands i.operands
   | Iifthenelse(tst, ifso, ifnot) ->
-      fprintf ppf "@[<v 2>if %a then@,%a" (test tst i.operands) i.operands instr ifso;
+      fprintf ppf "@[<v 2>if %a then@,%a" (test tst) i.operands instr ifso;
       begin match ifnot.desc with
       | Iend -> ()
       | _ -> fprintf ppf "@;<0 -2>else@,%a" instr ifnot

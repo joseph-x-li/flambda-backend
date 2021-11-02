@@ -405,7 +405,7 @@ let imm : 'a Cfg.instruction -> index:int -> Targetint.t option =
 
 let special_immediates expected result =
   match imm expected ~index:1, imm result ~index:1 with
-  | Some imm1, Some imm2 -> Int.equal imm1 (Int.pred imm2)
+  | Some imm1, Some imm2 -> Targetint.(equal imm1 (pred imm2))
   | None, _ | _, None -> false
 
 let check_terminator_instruction :

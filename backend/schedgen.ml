@@ -259,7 +259,7 @@ method private add_instruction ready_queue instr =
       emitted_ancestors = 0 } in
   (* Add edges from all instructions that define one of the registers used
      (RAW dependencies) *)
-  Reg.Set.iter (add_RAW_dependencies node) (Mach.arg_regset instr);
+  Reg.Set.iter (add_RAW_dependencies node) (Mach.arg_regset instr.operands);
   (* Also add edges from all instructions that use one of the result regs
      of this instruction, or a reg destroyed by this instruction
      (WAR dependencies). *)

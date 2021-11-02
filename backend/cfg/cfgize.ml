@@ -326,7 +326,7 @@ let is_noop_move (instr : Cfg.basic Cfg.instruction) : bool =
   match instr.Cfg.desc with
   | Op (Move | Spill | Reload) ->
     (* CR xclerc for xclerc: is testing the location enough? *)
-    Reg.same_loc (Mach.arg_reg instr.Cfg.operand.(0)) instr.Cfg.res.(0)
+    Reg.same_loc (Mach.arg_reg instr.Cfg.operands.(0)) instr.Cfg.res.(0)
   | Op
       ( Const_int _ | Const_float _ | Const_symbol _ | Stackoffset _ | Load _
       | Store _ | Intop _ | Floatop _ | Floatofint | Intoffloat | Probe _

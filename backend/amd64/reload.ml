@@ -105,7 +105,7 @@ method private one_mem_or_stack operands =
   if (Reg.is_stack (Mach.arg_reg operands.(0))) then
     match operands.(1) with
     | Ireg r' when Reg.is_stack r' ->
-      [| operand.(0); Ireg (self#makereg r') |]
+      [| operands.(0); Ireg (self#makereg r') |]
     | Ireg _ | Iimm _ -> operands
     | Iimmf _  (* float immediate is implemented as a memory load *)
     | Imem _ ->

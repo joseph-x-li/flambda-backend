@@ -148,11 +148,8 @@ val copy
 (* [arg_reg o] asserts that [o)] is [Ireg r] and returns [r]. *)
 val arg_reg : operand -> Reg.t
 
-(* (* [arg_reg i n] asserts that [i.operands.(n)] is [Ireg r] and returns [r]. *)
- * val arg_reg : instruction -> int -> Reg.t *)
-
-(* [arg_regset i] returns the set of registers used in instruction operands. *)
-val arg_regset : instruction -> Reg.Set.t
+(* [arg_regset operands] returns the set of registers used in [operands]. *)
+val arg_regset : operand array -> Reg.Set.t
 
 val same_loc : operand -> Reg.t -> bool
 

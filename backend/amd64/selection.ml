@@ -155,7 +155,7 @@ let pseudoregs_for_operation op arg res operands =
     ([|res.(0); arg.(1)|], res)
   (* Other instructions are regular *)
   | Iintop (Ipopcnt|Iclz _|Ictz _|Icomp _|Icheckbound)
-  | Ispecific (Isqrtf|Isextend32|Izextend32|Ilea _|Istore_int  _
+  | Ispecific (Isqrtf|Isextend32|Izextend32|Ilea _
               |Ifloat_iround|Ifloat_round _
               |Ioffset_loc (_, _)|Irdtsc|Iprefetch _)
   | Imove|Ispill|Ireload|Ifloatofint|Iintoffloat|Iconst_int _|Iconst_float _

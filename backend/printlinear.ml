@@ -44,7 +44,7 @@ let instr ppf i =
   | Lbranch lbl ->
       fprintf ppf "goto %a" label lbl
   | Lcondbranch(tst, lbl) ->
-      fprintf ppf "if %a goto %a" (test tst i.operands) i.arg label lbl
+      fprintf ppf "if %a goto %a" (test tst) i.operands label lbl
   | Lcondbranch3(lbl0, lbl1, lbl2) ->
       fprintf ppf "switch3 %a" operand i.operand.(0);
       let case n = function

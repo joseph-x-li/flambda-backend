@@ -140,12 +140,12 @@ let arg_reg operand =
   | Ireg r -> r
   | _ -> Misc.fatal_error "Mach.arg_reg: operand is not Ireg"
 
-let arg_regset i =
+let arg_regset operands =
   Array.fold_left (fun s -> function
     | Iimm _ | Iimmf _ -> s
     | Ireg r -> Reg.Set.add r s
     | Imem (_,_,r) -> Reg.add_set_array s r)
-    Reg.Set.empty i.operands
+    Reg.Set.empty operands
 
 let same_loc operand reg =
   match operand with

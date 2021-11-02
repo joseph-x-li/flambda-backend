@@ -46,7 +46,7 @@ let simplify_switch (block : C.basic_block) labels =
       labels []
   in
   let operands imm =
-    [| block.terminator.operands.(0); Iimm (Targetint.of_int imm) |]
+    [| block.terminator.operands.(0); Mach.Iimm (Targetint.of_int imm) |]
   in
   match labels_with_counts with
   | [(l, _)] ->
