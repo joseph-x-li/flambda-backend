@@ -37,6 +37,18 @@ let subst_regs rv sub =
       for i = 0 to n-1 do nv.(i) <- subst_reg rv.(i) s done;
       nv
 
+let subst_reg_in_operand o (sub : subst) =
+  match o with
+  | Ireg r -> Ireg (subst_reg r sub)
+  | Iimm _ | Iimmf _ -> o
+  | Imem (c,a,rv) -> Imem (c,ar,subst_reg rv sub)
+
+let subst_regs_in_operands v sub =
+  match sub with
+    None -> v
+  | Some s ->
+      Array.init (Array.length v) (fun i -> subst_reg_in_operand v.(i) s)
+
 (* We maintain equivalence classes of registers using a standard
    union-find algorithm *)
 

@@ -203,8 +203,8 @@ let find_in_reload_cache nfail env =
 
 let rec reload env i before =
   let env = { env with current_date = succ env.current_date; } in
-  let env = record_use env i.operands in
-  let env = record_use env Reg.set_of_array i.res in
+  let env = record_use env (Mach.arg_regset i.operands) in
+  let env = record_use env (Reg.set_of_array i.res) in
   match i.desc with
     Iend ->
       (i, before, env)

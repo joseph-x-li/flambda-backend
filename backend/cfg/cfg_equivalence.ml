@@ -218,11 +218,8 @@ let check_operation : location -> Cfg.operation -> Cfg.operation -> unit =
     when Cmm.equal_memory_chunk expected_mem result_mem
          && Arch.equal_addressing_mode expected_arch_mode result_arch_mode ->
     ()
-  | ( Store (expected_mem, expected_arch_mode, expected_bool),
-      Store (result_mem, result_arch_mode, result_bool) )
-    when Cmm.equal_memory_chunk expected_mem result_mem
-         && Arch.equal_addressing_mode expected_arch_mode result_arch_mode
-         && Bool.equal expected_bool result_bool ->
+  | Store expected_bool, Store result_bool
+    when Bool.equal expected_bool result_bool ->
     ()
   | Intop left_op, Intop right_op
     when Mach.equal_integer_operation left_op right_op ->

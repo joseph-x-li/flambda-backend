@@ -38,7 +38,7 @@ let instr ppf i =
   | Lreloadretaddr ->
       fprintf ppf "reload retaddr"
   | Lreturn ->
-      fprintf ppf "return %a" operands i.machoperands
+      fprintf ppf "return %a" operands i.operands
   | Llabel lbl ->
       fprintf ppf "%a:" label lbl
   | Lbranch lbl ->

@@ -276,7 +276,7 @@ let dump_terminator ppf ?(sep = "\n") ti =
         Array.fold_left
           (fun cmp operand ->
             match (operand : Mach.operand) with
-            | Iimm n -> Printf.sprintf "%s imm %a" cmp Targetint.print n
+            | Iimm n -> Format.asprintf "%s imm %a" cmp (Targetint.print n)
             | Iimmf f -> Printf.sprintf "%s immf %f" cmp (Int64.float_of_bits f)
             | Ireg j -> Format.asprintf "%s reg %s" cmp Printmach.reg r
             | Imem _ -> Printf.sprintf "%s mem" cmp)

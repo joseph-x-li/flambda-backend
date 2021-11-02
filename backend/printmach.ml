@@ -51,7 +51,7 @@ let regs ppf v =
 
 let operand ppf = function
   | Ireg r -> fprintf ppf "reg %a" reg r
-  | Iimm i -> fprintf ppf "imm %ni" Targetint.print i
+  | Iimm i -> fprintf ppf "imm %a" Targetint.print i
   | Iimmf f -> fprintf ppf "immf %F" (Int64.float_of_bits f)
   | Imem (c, a, r) ->
     fprintf ppf "mem %s[%a]" (Printcmm.chunk c)

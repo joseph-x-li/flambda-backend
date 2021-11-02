@@ -160,7 +160,7 @@ module Operands : sig
 end = struct
 
   type operand_builder =
-    | Iimm of int
+    | Iimm of Targetint.t
     | Iimmf of int64
     | Ireg of int                               (** Index into instruction.arg *)
     | Imem of Cmm.memory_chunk * Arch.addressing_mode * int array

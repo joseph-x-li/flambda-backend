@@ -237,14 +237,13 @@ let terminator_of_test :
 let make_instruction :
     type a. State.t -> desc:a -> trap_depth:int -> a Cfg.instruction =
  fun state ~desc ~trap_depth ->
-  let arg = [||] in
   let res = [||] in
   let operands = [||] in
   let dbg = Debuginfo.none in
   let fdo = Fdo_info.none in
   let live = Reg.Set.empty in
   let id = State.get_next_instruction_id state in
-  { desc; arg; res; operands; dbg; live; trap_depth; id; fdo }
+  { desc; res; operands; dbg; live; trap_depth; id; fdo }
 
 let copy_instruction :
     type a.
@@ -264,15 +263,14 @@ let copy_instruction :
   in
   let id = State.get_next_instruction_id state in
   let fdo = Fdo_info.none in
-  { desc; arg; res; operands; dbg; live; trap_depth; id; fdo }
+  { desc; res; operands; dbg; live; trap_depth; id; fdo }
 
 let copy_instruction_no_reg :
     type a.
     State.t -> Mach.instruction -> desc:a -> trap_depth:int -> a Cfg.instruction
     =
  fun state instr ~desc ~trap_depth ->
-  let { Mach.arg = _;
-        res = _;
+  let { Mach.res = _;
         operands = _;
         dbg;
         live;
@@ -283,12 +281,11 @@ let copy_instruction_no_reg :
       } =
     instr
   in
-  let arg = [||] in
   let res = [||] in
   let operands = [||] in
   let id = State.get_next_instruction_id state in
   let fdo = Fdo_info.none in
-  { desc; arg; res; operands; dbg; live; trap_depth; id; fdo }
+  { desc; res; operands; dbg; live; trap_depth; id; fdo }
 
 let can_raise_operation : Cfg.operation -> bool =
  fun op ->
@@ -329,7 +326,7 @@ let is_noop_move (instr : Cfg.basic Cfg.instruction) : bool =
   match instr.Cfg.desc with
   | Op (Move | Spill | Reload) ->
     (* CR xclerc for xclerc: is testing the location enough? *)
-    Reg.same_loc instr.Cfg.arg.(0) instr.Cfg.res.(0)
+    Reg.same_loc (Mach.arg_reg instr.Cfg.operand.(0)) instr.Cfg.res.(0)
   | Op
       ( Const_int _ | Const_float _ | Const_symbol _ | Stackoffset _ | Load _
       | Store _ | Intop _ | Floatop _ | Floatofint | Intoffloat | Probe _

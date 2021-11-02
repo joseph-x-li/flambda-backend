@@ -315,7 +315,7 @@ let destroyed_at_oper = function
   | Itrywith _ -> [| r11 |]
   | Iop(Ispecific (Irdtsc | Irdpmc)) -> [| rax; rdx |]
   | Iop(Ispecific(Isqrtf | Isextend32 | Izextend32 | Icrc32q | Ilea _
-                 | Istore_int (_, _, _) | Ioffset_loc (_, _)
+                 | Istore_int _ | Ioffset_loc
                  | Iprefetch _
                  | Ifloat_round _
                  | Ifloat_iround | Ifloat_min | Ifloat_max

@@ -30,7 +30,7 @@ method! class_of_operation op operands =
   | Ispecific spec ->
     begin match spec with
     | Ilea _ | Isextend32 | Izextend32 -> Op_pure
-    | Ioffset_loc(_, _) -> Op_store true
+    | Ioffset_loc -> Op_store true
     | Ibswap _ | Isqrtf -> super#class_of_operation op operands
     | Irdtsc | Irdpmc -> Op_other
     | Ifloat_iround | Ifloat_min | Ifloat_max | Ifloat_round _

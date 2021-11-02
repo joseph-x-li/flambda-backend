@@ -72,7 +72,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | None -> next
       | Some l ->
         Linear.instr_cons (Lcondbranch (Iinttest (Isigned Cmm.Ceq), l))
-          [||] [| operands.(0); Iimm n; |] next
+          [||] [| operands.(0); Iimm (Targetint.of_int n) |] next
     in
     let rec fixup did_fix pc instr =
       match instr.desc with
