@@ -41,7 +41,7 @@ let rec combine i allocstate =
                               dbginfos = dbginfo @ dbginfos;
                               totalsz = totalsz + sz }) in
          (instr_cons_debug (Iop (Iintop Iadd))
-            i.res [| Ireg reg; Iimm (-sz) |] i.dbg next,
+            i.res [| Ireg reg; Iimm Targetint.of_int(-sz) |] i.dbg next,
            state)
       | No_alloc | Pending_alloc _ ->
          let (next, state) =

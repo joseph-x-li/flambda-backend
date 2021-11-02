@@ -71,7 +71,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
       match lbl with
       | None -> next
       | Some l ->
-        Mach.instr_cons (Lcondbranch (Iinttest (Isigned Cmm.Ceq), l))
+        Linear.instr_cons (Lcondbranch (Iinttest (Isigned Cmm.Ceq), l))
           [||] [| operands.(0); Iimm n; |] next
     in
     let rec fixup did_fix pc instr =

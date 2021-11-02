@@ -88,7 +88,7 @@ let is_stack operands ~index =
 let same_loc_arg0_res0 res operands =
   if Array.length operands > 0 then
     match operands.(0) with
-    | Ireg j -> Reg.same_loc arg.(j) res.(0)
+    | Ireg r -> Reg.same_loc r res.(0)
     | Iimm _ | Iimmf _ |  Imem _ -> false
   else
     Reg.same_loc arg.(0) res.(0)

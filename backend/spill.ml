@@ -112,13 +112,13 @@ let spill_reg env r =
     spill_r
 
 let record_use env regset =
-  let use_date = Reg.Set.fold_left (fun r use_date ->
+  let use_date = Reg.Set.fold (fun r use_date ->
       let prev_date = try Reg.Map.find r use_date with Not_found -> 0 in
       if env.current_date > prev_date then
         Reg.Map.add r env.current_date use_date
       else
         use_date)
-    env.use_date regset
+    regset env.use_date
   in
   { env with use_date; }
 

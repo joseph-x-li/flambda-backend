@@ -147,7 +147,7 @@ let rec available_regs (instr : M.instruction)
         in
         let avail_after = ref forgetting_ident in
         (* CR gyorsh: does order matter here and if so - is it deterministic ? *)
-        let arg = Mach.arg_regs instr |> Reg.Set.elements |> Array.of_list in
+        let arg = Mach.arg_regset instr |> Reg.Set.elements |> Array.of_list in
         let num_parts_of_value = Array.length arg in
         (* Add debug info about [ident], but only for registers that are known
            to be available. *)

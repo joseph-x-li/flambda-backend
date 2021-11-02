@@ -178,7 +178,7 @@ method private instr_in_basic_block instr try_nesting =
    load or store instructions (e.g. on the I386). *)
 
 method is_store = function
-    Istore(_, _, _) -> true
+    Istore  _ -> true
   | _ -> false
 
 method is_load = function

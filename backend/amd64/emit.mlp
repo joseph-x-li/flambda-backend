@@ -244,14 +244,6 @@ let emit_subreg typ r =
   | Stack s -> mem64 typ (slot_offset s (register_class r)) RSP
   | _ -> assert false
 
-let arg_reg i n =
-  match Array.length i.operands with
-  | 0 -> i.arg.(n)
-  | _ ->
-     match i.operands.(n) with
-     | Ireg j -> i.arg.(j)
-     | _ -> Misc.fatal_error ("Emit.arg_reg " ^ string_of_int n)
-
 (* Floating-point constants *)
 
 let float_constants = ref ([] : (int64 * int) list)

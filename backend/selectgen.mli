@@ -202,7 +202,7 @@ class virtual selector_generic : object
      are not always applied to "self", but ideally they should be private. *)
   method extract : Mach.instruction
   method insert :
-    environment -> Mach.instruction_desc -> Reg.t array -> Mach.operands array
+    environment -> Mach.instruction_desc -> Reg.t array -> Mach.operand array
     -> unit
   method insert_debug :
     environment -> Mach.instruction_desc -> Debuginfo.t ->

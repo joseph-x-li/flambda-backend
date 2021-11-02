@@ -107,7 +107,7 @@ let merge_subst_array subv instr =
               None -> ()
             | Some sj ->
                 Reg.Set.iter (identify_sub si sj)
-                             (Reg.add_set_array instr.live instr.arg)
+                             (Reg.Set.union instr.live (Mach.arg_regset instr))
           done;
           sub
     end in

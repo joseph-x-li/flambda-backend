@@ -397,7 +397,7 @@ let rec check_basic_instruction_list :
     check_basic_instruction state location idx expected_hd result_hd;
     check_basic_instruction_list state location (succ idx) expected_tl result_tl
 
-let imm : 'a Cfg.instruction -> index:int -> int option =
+let imm : 'a Cfg.instruction -> index:int -> Targetint.t option =
  fun i ~index ->
   match Array.length i.operands with
   | 0 -> None

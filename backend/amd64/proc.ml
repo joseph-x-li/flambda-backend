@@ -307,7 +307,7 @@ let destroyed_at_oper = function
   | Iop(Iextcall { alloc = false; }) -> destroyed_at_c_call
   | Iop(Iintop(Idiv | Imod))
         -> [| rax; rdx |]
-  | Iop(Istore(Single, _, _)) -> [| rxmm15 |]
+  | Iop(Istore _) -> [| rxmm15 |]
   | Iop(Ialloc _) -> destroyed_at_alloc
   | Iop(Iintop(Imulh _ | Icomp _))
         -> [| rax |]

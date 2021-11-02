@@ -138,12 +138,7 @@ let end_instr () =
 let arg_reg operand =
   match operand with
   | Ireg r -> r
-  | _ -> assert false
-
-(* let arg_reg i n =
- *   match i.operands.(n) with
- *   | Ireg r -> r
- *   | _ -> assert false *)
+  | _ -> Misc.fatal_error "Mach.arg_reg: operand is not Ireg"
 
 let arg_regset i =
   Array.fold_left (fun s -> function
@@ -388,7 +383,7 @@ let equal_float_operation left right =
 
 let equal_operand left right =
   match left, right with
-  | Iimm left, Iimm right -> Int.equal left right
+  | Iimm left, Iimm right -> Targetint.equal left right
   | Iimmf left, Iimmf right -> Int64.equal left right
   | Ireg left, Ireg right -> Reg.same_loc left right
   | Imem (chunk_left, addr_left, left), Imem (chunk_right, addr_right, right) ->

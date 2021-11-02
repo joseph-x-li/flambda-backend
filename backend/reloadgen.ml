@@ -46,7 +46,7 @@ let insert_moves_operands src dst next =
       | o, o' when Mach.equal_operand o o' -> insmoves (i+1)
       | Ireg r_src, Ireg r_dst -> insert_move r_src r_dst (insmoves (i+1))
       | Imem (c,a,rv), Imem (c',a',rv')
-        when Cmm.equal_chunks c c' &&
+        when Cmm.equal_memory_chunks c c' &&
              Arch.equal_addresing_mode a a' ->
         insert_moves (operands rv) rv' (insmoves (i+1))
       (* | (Imem _ | Iimm _ | Iimmf _), Ireg r when not (Reg.is_stack r) ->

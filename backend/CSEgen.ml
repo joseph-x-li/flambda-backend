@@ -247,7 +247,7 @@ method class_of_operation op operands =
   | Iextcall _ | Iprobe _ | Iopaque -> assert false  (* treated specially *)
   | Istackoffset _ -> Op_other
   | Iload(_,_) -> Op_load
-  | Istore(_,_,asg) -> Op_store asg
+  | Istore asg -> Op_store asg
   | Ialloc _ -> assert false                   (* treated specially *)
   | Iintop(Icheckbound) -> Op_checkbound
   | Iintop _ -> if is_memory operands then Op_load else Op_pure

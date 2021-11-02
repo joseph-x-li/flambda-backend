@@ -45,8 +45,8 @@ let simplify_switch (block : C.basic_block) labels =
             if Label.equal hd l then (hd, n + 1) :: tl else (l, 1) :: acc)
       labels []
   in
-  let operands : int -> Mach.operand array =
-   fun imm -> [| block.terminator.operands.(0); Iimm imm |]
+  let operands imm =
+    [| block.terminator.operands.(0); Iimm imm |]
   in
   match labels_with_counts with
   | [(l, _)] ->
