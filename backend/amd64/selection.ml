@@ -285,11 +285,14 @@ method select_addressing _chunk exp =
         (Iindexed2scaled(scale, d), Ctuple[e1; e2], 2)
 
 method! select_store is_assign addr exp =
+  (* CR gyorsh: can it now be done simply with select_operands? *)
   match exp with
     Cconst_int (n, _dbg) when is_immediate n ->
-      (Ispecific(Istore_int(Nativeint.of_int n, addr, is_assign)), Ctuple [])
+    (Ispecific(Istore_int is_assign), Ctuple [],
+     [| Iimm (Targetint.of_int n) |])
   | (Cconst_natint (n, _dbg)) when is_immediate_natint n ->
-      (Ispecific(Istore_int(n, addr, is_assign)), Ctuple [])
+    (Ispecific(Istore_int is_assign), Ctuple [],
+     [| Iimm n |])
   | Cconst_int _
   | Cconst_natint (_, _) | Cconst_float (_, _) | Cconst_symbol (_, _)
   | Cvar _ | Clet (_, _, _) | Clet_mut (_, _, _, _) | Cphantom_let (_, _, _)

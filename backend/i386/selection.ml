@@ -316,7 +316,7 @@ method! emit_extcall_args env _ty_args args =
       let (op, arg) = self#select_push e in
       match self#emit_expr env arg with
       | None -> ()
-      | Some r -> self#insert env (Iop op) r [||] in
+      | Some r -> self#insert env (Iop op) [| Ireg r |] [||] in
   emit_pushes args;
   ([||], sz2)
 

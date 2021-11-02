@@ -63,7 +63,7 @@ type operation =
                   alloc : bool; returns : bool; }
   | Istackoffset of int
   | Iload of Cmm.memory_chunk * Arch.addressing_mode
-  | Istore of Cmm.memory_chunk * Arch.addressing_mode * bool
+  | Istore of bool
   | Ialloc of { bytes : int; dbginfo : Debuginfo.alloc_dbginfo; }
   | Iintop of integer_operation
   | Ifloatop of float_operation
@@ -76,7 +76,7 @@ type operation =
   | Iprobe_is_enabled of { name: string }
 
 type operand =
-  | Iimm of int
+  | Iimm of Targetint.t
   | Iimmf of int64
   | Ireg of Reg.t
   | Imem of Cmm.memory_chunk * Arch.addressing_mode * Reg.t array

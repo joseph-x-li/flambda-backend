@@ -136,7 +136,7 @@ class virtual selector_generic : object
     (* Can be overridden to deal with special test instructions *)
   method select_store :
     bool -> Arch.addressing_mode -> Cmm.expression ->
-                                         Mach.operation * Cmm.expression
+    Mach.operation * Cmm.expression * Operands.t
     (* Can be overridden to deal with special store constant instructions *)
   method memory_operands_supported : Mach.operation -> Cmm.memory_chunk -> bool
     (* Can be overridden to enable memory operands selection *)
@@ -202,8 +202,8 @@ class virtual selector_generic : object
      are not always applied to "self", but ideally they should be private. *)
   method extract : Mach.instruction
   method insert :
-    environment -> Mach.instruction_desc -> Reg.t array -> Reg.t array ->
-    Operands.t -> unit
+    environment -> Mach.instruction_desc -> Reg.t array -> Mach.operands array
+    -> unit
   method insert_debug :
     environment -> Mach.instruction_desc -> Debuginfo.t ->
       Reg.t array -> Reg.t array -> Operands.t -> unit

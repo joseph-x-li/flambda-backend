@@ -77,9 +77,7 @@ type rounding_mode = Half_to_even | Down | Up | Towards_zero | Current
 
 type specific_operation =
     Ilea of addressing_mode             (* "lea" gives scaled adds *)
-  | Istore_int of nativeint * addressing_mode * bool
-                                        (* Store an integer constant *)
-  | Ioffset_loc of int * addressing_mode (* Add a constant to a location *)
+  | Ioffset_loc                        (* Add a constant to a location *)
   | Ibswap of int                      (* endianness conversion *)
   | Isqrtf                             (* Float square root *)
   | Ifloat_iround                      (* Rounds a [float] to an [int64]
@@ -174,8 +172,7 @@ let print_addressing printreg addr ppf arg =
 let print_specific_operation_name op =
   match op with
   | Ilea addr -> "lea"
-  | Istore_int _ -> "store_int"
-  | Ioffset_loc _ -> "offset_loc"
+  | Ioffset_loc -> "offset_loc"
   | Isqrtf -> "sqrtf"
   | Ifloat_iround -> "float_iround"
   | Ifloat_round mode -> "float_round"
@@ -192,13 +189,8 @@ let print_specific_operation_name op =
 let print_specific_operation printreg printoperand op ppf arg =
   match op with
   | Ilea addr -> print_addressing printreg addr ppf arg
-  | Istore_int(n, addr, is_assign) ->
-      fprintf ppf "[%a] := %nd %s"
-         (print_addressing printreg addr) (Array.map Mach.arg_reg arg) n
-         (if is_assign then "(assign)" else "(init)")
-  | Ioffset_loc(n, addr) ->
-      fprintf ppf "[%a] +:= %i" (print_addressing printreg addr)
-        (Array.map Mach.arg_reg arg)  n
+  | Ioffset_loc ->
+      fprintf ppf "[%a] +:= %a" printoperand arg.(0) printoperand arg.(1)
   | Isqrtf ->
       fprintf ppf "sqrtf %a" printoperand arg.(0)
   | Ifloat_iround -> fprintf ppf "float_iround %a" printoperand arg.(0)
@@ -298,10 +290,8 @@ let equal_rounding_mode left right =
 let equal_specific_operation left right =
   match left, right with
   | Ilea x, Ilea y -> equal_addressing_mode x y
-  | Istore_int (x, x', x''), Istore_int (y, y', y'') ->
-    Nativeint.equal x y && equal_addressing_mode x' y' && Bool.equal x'' y''
-  | Ioffset_loc (x, x'), Ioffset_loc (y, y') ->
-    Int.equal x y && equal_addressing_mode x' y'
+  | Ioffset_loc, Ioffset_loc ->
+    true
   | Ibswap left, Ibswap right ->
     Int.equal left right
   | Isqrtf, Isqrtf ->
@@ -325,7 +315,7 @@ let equal_specific_operation left right =
     Bool.equal left_is_write right_is_write
     && equal_prefetch_temporal_locality_hint left_locality right_locality
     && equal_addressing_mode left_addr right_addr
-  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ibswap _
+  | (Ilea _ | Ioffset_loc | Ibswap _
     | Isqrtf | Isextend32 | Izextend32 | Irdtsc | Irdpmc
     | Ifloat_iround | Ifloat_round _ | Ifloat_min | Ifloat_max
     | Icrc32q | Iprefetch _), _ ->
