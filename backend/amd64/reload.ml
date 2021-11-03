@@ -113,7 +113,7 @@ method private one_mem_or_stack operands =
       (* CR gyorsh: this is different, previously we would always
          force operand.(1), but not that it can be mem, we have to force
          operand.(0) which is already forced to be the same as res.(0). *)
-      [| Ireg (self#makereg r); operand.(1) |]
+      [| Ireg (self#makereg r); operands.(1) |]
   else
     operands
 

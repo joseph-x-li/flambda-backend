@@ -158,7 +158,7 @@ method private reload i k =
       self#reload i.next (fun next ->
         k (insert_moves_operands i.operands newarg
              (Mach.copy i ~operands:newarg ~res:newres
-                     ~next:(insert_moves (operands newres) i.res next))))
+                     ~next:(insert_moves newres i.res next))))
   | Iifthenelse(tst, ifso, ifnot) ->
       let newarg = self#reload_test tst i.operands in
       self#reload ifso (fun ifso ->

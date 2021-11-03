@@ -106,7 +106,7 @@ let rec live env i finally =
       && not (Proc.regs_are_volatile
                 (Mach.arg_regset i.operands))
       && not (Proc.regs_are_volatile
-                (Reg.set_of_array i.res)(* no stack-like hard reg in involved*)
+                (Reg.set_of_array i.res))(* no stack-like hard reg in involved*)
       then begin
         (* This operation is dead code.  Ignore its arguments. *)
         Mach.update i ~live:after;
@@ -131,7 +131,7 @@ let rec live env i finally =
            | _ ->
                across_after in
         Mach.update i ~live:across;
-        Reg.Set.union across (Mach.arg_regset i)
+        Reg.Set.union across (Mach.arg_regset i.operands)
       end
   | Iifthenelse(_test, ifso, ifnot) ->
       let at_join = live env i.next finally in

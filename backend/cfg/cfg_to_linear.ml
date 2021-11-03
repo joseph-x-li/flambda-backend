@@ -248,12 +248,12 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
         let cond_successor_labels = Label.Set.remove last successor_labels in
         let imm1 =
           match terminator.operands.(1) with
-          | Iimm Targetint.one -> true
-          | Iimmf _ | Ireg | _ | Imem -> false
+          | Iimm n when Targetint.equal n  Targetint.one -> true
+          | Iimm _ | Iimmf _ | Ireg _ | Imem _ -> false
         in
         (* Lcondbranch3 is emitted as an unsigned comparison, see ocaml PR
            #8677 *)
-        let can_emit_Lcondbranch3 = not is_signed && imm_1 in
+        let can_emit_Lcondbranch3 = not is_signed && imm1 in
         if Label.Set.cardinal cond_successor_labels = 2 && can_emit_Lcondbranch3
         then
           (* generates one cmp instruction for all conditional jumps here *)
@@ -261,22 +261,24 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
           [L.Lcondbranch3 (find lt, find eq, find gt)], None
         else
           let init = branch_or_fallthrough last in
-          ( Label.Set.fold
+          let res =
+            Label.Set.fold
               (fun lbl acc ->
-                let cond =
-                  mk_int_test ~lt:(Label.equal lt lbl) ~eq:(Label.equal eq lbl)
-                    ~gt:(Label.equal gt lbl)
-                in
-                let comp =
-                  match is_signed with
-                  | true -> Mach.Isigned cond
-                  | false -> Mach.Iunsigned cond
-                in
-                let test = Mach.Iinttest comp in
-                L.Lcondbranch (test, lbl) :: acc)
-              cond_successor_labels init,
-            None )
-      | _ -> assert false)
+                 let cond =
+                   mk_int_test ~lt:(Label.equal lt lbl) ~eq:(Label.equal eq lbl)
+                     ~gt:(Label.equal gt lbl)
+                 in
+                 let comp =
+                   match is_signed with
+                   | true -> Mach.Isigned cond
+                   | false -> Mach.Iunsigned cond
+                 in
+                 let test = Mach.Iinttest comp in
+                 L.Lcondbranch (test, lbl) :: acc)
+              cond_successor_labels init
+          in
+          res, None
+          | _ -> assert false)
   in
   ( List.fold_left
       (fun next desc -> to_linear_instr ~like:terminator desc ~next)
