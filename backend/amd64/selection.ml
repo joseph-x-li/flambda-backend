@@ -160,7 +160,7 @@ let pseudoregs_for_operation op arg res operands =
               |Ioffset_loc (_, _)|Irdtsc|Iprefetch _)
   | Imove|Ispill|Ireload|Ifloatofint|Iintoffloat|Iconst_int _|Iconst_float _
   | Iconst_symbol _|Icall_ind|Icall_imm _|Itailcall_ind|Itailcall_imm _
-  | Iextcall _|Istackoffset _|Iload (_, _)|Istore (_, _, _)|Ialloc _
+  | Iextcall _|Istackoffset _|Iload (_, _)|Istore _|Ialloc _
   | Iname_for_debugger _|Iprobe _|Iprobe_is_enabled _ | Iopaque
     -> raise Use_default
 
@@ -229,7 +229,7 @@ method! memory_operands_supported op chunk =
   | ((Imove | Ispill | Ireload | Icall_ind | Itailcall_ind | Iopaque
      | Iconst_int _ | Iconst_float _ | Iconst_symbol _ | Icall_imm _
      | Itailcall_imm _ |Iextcall _ | Istackoffset _
-     | Iload (_, _) | Istore (_, _, _) | Ialloc _ | Iname_for_debugger _
+     | Iload (_, _) | Istore _ | Ialloc _ | Iname_for_debugger _
      | Iprobe _|Iprobe_is_enabled _), _) -> assert false
 
 method! memory_operands_supported_condition (op : Mach.test) chunk =
@@ -288,11 +288,9 @@ method! select_store is_assign addr exp =
   (* CR gyorsh: can it now be done simply with select_operands? *)
   match exp with
     Cconst_int (n, _dbg) when is_immediate n ->
-    (Ispecific(Istore_int is_assign), Ctuple [],
-     [| Iimm (Targetint.of_int n) |])
+    (Ispecific(Istore is_assign), Ctuple [], [| Iimm (Targetint.of_int n) |])
   | (Cconst_natint (n, _dbg)) when is_immediate_natint n ->
-    (Ispecific(Istore_int is_assign), Ctuple [],
-     [| Iimm n |])
+    (Ispecific(Istore is_assign), Ctuple [], [| Iimm n |])
   | Cconst_int _
   | Cconst_natint (_, _) | Cconst_float (_, _) | Cconst_symbol (_, _)
   | Cvar _ | Clet (_, _, _) | Clet_mut (_, _, _, _) | Cphantom_let (_, _, _)

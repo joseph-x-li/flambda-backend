@@ -301,13 +301,24 @@ let destroyed_at_alloc =
   else
     [| r11 |]
 
-let destroyed_at_oper = function
+let destroyed_at_oper i =
+  match i.desc with
     Iop(Icall_ind | Icall_imm _ | Iextcall { alloc = true; }) ->
     all_phys_regs
   | Iop(Iextcall { alloc = false; }) -> destroyed_at_c_call
   | Iop(Iintop(Idiv | Imod))
         -> [| rax; rdx |]
-  | Iop(Istore _) -> [| rxmm15 |]
+  | Iop(Istore _) ->
+    (match Mach.arg_mem i.operand.(1) with
+     | Imem (Single, _, _) ->  [| rxmm15 |]
+     | Imem (_,_,_) ->
+       if fp then
+         (* prevent any use of the frame pointer ! *)
+         [| rbp |]
+       else
+         [||]
+     | Iimm _ | Iimmf _ | Iref _ ->
+       Misc.fatal_error "Proc.destroyed_at_oper Istore")
   | Iop(Ialloc _) -> destroyed_at_alloc
   | Iop(Iintop(Imulh _ | Icomp _))
         -> [| rax |]
@@ -322,9 +333,6 @@ let destroyed_at_oper = function
                  | Ibswap _))
   | Iop(Iintop(Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
               | Ipopcnt | Iclz _ | Ictz _ | Icheckbound))
-  | Iop(Istore((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-               | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
-               | Double ), _, _))
   | Iop(Ifloatop(Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf | Icompf _))
   | Iop(Imove | Ispill | Ireload
        | Ifloatofint | Iintoffloat
@@ -354,17 +362,17 @@ let safe_register_pressure = function
   | Ifloatop _ | Ifloatofint | Iintoffloat
   | Iconst_int _ | Iconst_float _ | Iconst_symbol _
   | Icall_ind | Icall_imm _ | Itailcall_ind | Itailcall_imm _
-  | Istackoffset _ | Iload (_, _) | Istore (_, _, _)
+  | Istackoffset _ | Iload (_, _) | Istore _
   | Iintop _ | Ispecific _ | Iname_for_debugger _
   | Iprobe _ | Iprobe_is_enabled _ | Iopaque
     -> if fp then 10 else 11
 
-let max_register_pressure =
+let max_register_pressure i =
   let consumes ~int ~float =
     if fp
     then [| 12 - int; 16 - float |]
     else [| 13 - int; 16 - float |]
-  in function
+  in match i.desc with
     Iextcall _ ->
     if win64
       then consumes ~int:5 ~float:6
@@ -375,8 +383,12 @@ let max_register_pressure =
     consumes ~int:(1 + num_destroyed_by_plt_stub) ~float:0
   | Iintop(Icomp _) ->
     consumes ~int:1 ~float:0
-  | Istore(Single, _, _) | Ifloatop(Icompf _) ->
-    consumes ~int:0 ~float:1
+  | Istore(Single, _, _) ->
+    (match i.operands.(1) with
+     | Imem (Single,_,_) -> consumes ~int:0 ~float:1
+     | Imem (_,_,_) -> -> consumes ~int:0 ~float:0
+     | Iimm _ | Iimmf _ | Iref _ ->
+       Misc.fatal_error "Proc.destroyed_at_oper Istore")
   | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
            | Ipopcnt|Iclz _| Ictz _|Icheckbound)
   | Istore((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed

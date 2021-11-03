@@ -281,7 +281,7 @@ end = struct
     | Imove | Ispill | Ireload | Icall_ind | Itailcall_ind | Iopaque
     | Iconst_int _ | Iconst_float _ | Iconst_symbol _
     | Icall_imm _ | Itailcall_imm _ | Iextcall _
-    | Istackoffset _ | Iload (_, _) | Istore (_, _, _) | Ialloc _
+    | Istackoffset _ | Iload (_, _) | Istore _ | Ialloc _
     | Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ -> assert false
 
   let report operands ?(swap = false) (op : Mach.operation) =
@@ -677,8 +677,8 @@ method virtual select_addressing :
 
 (* Default instruction selection for stores (of words) *)
 
-method select_store is_assign addr len arg =
-  (Istore is_assign, arg, [| mem ~chunk:Word_val ~addr ~len |])
+method select_store is_assign addr arg =
+  (Istore is_assign, arg, Ireg 0)
 
 (* call marking methods, documented in selectgen.mli *)
 val contains_calls = ref false
@@ -729,6 +729,7 @@ method select_operation op args _dbg =
       (Iload(chunk, addr), [eloc], (Operands.in_registers ()))
   | (Cstore (chunk, init), [arg1; arg2]) ->
       let (addr, eloc, len) = self#select_addressing chunk arg1 in
+      let mk_mem = Operands.mem chunk addr ~len in
       let is_assign =
         match init with
         | Lambda.Root_initialization -> false
@@ -736,11 +737,11 @@ method select_operation op args _dbg =
         | Lambda.Assignment -> true
       in
       if chunk = Word_int || chunk = Word_val then begin
-        let (op, newarg2) = self#select_store is_assign addr len arg2 in
-        (op, [newarg2; eloc], (Operands.in_registers ()))
+        let (op, newarg2, operands) = self#select_store is_assign addr arg2 in
+        (op, [newarg2; eloc],
+         Array.append operands [| mk_mem ~index:(Array.length operands) |])
       end else begin
-        (Istore(chunk, addr, is_assign), [arg2; eloc],
-         (Operands.in_registers ()))
+        (Istore is_assign, [arg2; eloc], [| Ireg 0; mk_mem ~index:1 |])
         (* Inversion addr/datum in Istore *)
       end
   | (Calloc, _) -> (Ialloc {bytes = 0; dbginfo = []}), args,

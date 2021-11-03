@@ -102,14 +102,18 @@ method private one_stack arg =
 
 method private one_mem_or_stack operands =
   (* First operand must be Ireg *)
-  if (Reg.is_stack (Mach.arg_reg operands.(0))) then
+  let r = (Mach.arg_reg operands.(0))
+  if Reg.is_stack r then
     match operands.(1) with
     | Ireg r' when Reg.is_stack r' ->
       [| operands.(0); Ireg (self#makereg r') |]
     | Ireg _ | Iimm _ -> operands
     | Iimmf _  (* float immediate is implemented as a memory load *)
     | Imem _ ->
-      [| Ireg (self#makereg r); operand.(1) |]
+      (* CR gyorsh: this is different, previously we would always
+         force operand.(1), but not that it can be mem, we have to force
+         operand.(0) which is already forced to be the same as res.(0). *)
+      [| Ireg self#makereg r; operand.(1) |]
   else
     operands
 

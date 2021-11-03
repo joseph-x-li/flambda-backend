@@ -185,13 +185,7 @@ let reg_is_volatile = function
   | _ -> false
 
 let regs_are_volatile rs =
-  try
-    for i = 0 to Array.length rs - 1 do
-      if reg_is_volatile rs.(i) then raise Exit
-    done;
-    false
-  with Exit ->
-    true
+  Reg.Set.exists reg_is_volatile rs
 
 (* Registers destroyed by operations *)
 
