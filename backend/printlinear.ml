@@ -46,7 +46,7 @@ let instr ppf i =
   | Lcondbranch(tst, lbl) ->
       fprintf ppf "if %a goto %a" (test tst) i.operands label lbl
   | Lcondbranch3(lbl0, lbl1, lbl2) ->
-      fprintf ppf "switch3 %a" operand i.operand.(0);
+      fprintf ppf "switch3 %a" operand i.operands.(0);
       let case n = function
       | None -> ()
       | Some lbl ->
@@ -54,7 +54,7 @@ let instr ppf i =
       case 0 lbl0; case 1 lbl1; case 2 lbl2;
       fprintf ppf "@,endswitch"
   | Lswitch lblv ->
-      fprintf ppf "switch %a" operand i.operand.(0);
+      fprintf ppf "switch %a" operand i.operands.(0);
       for i = 0 to Array.length lblv - 1 do
        fprintf ppf "case %i: goto %a" i label lblv.(i)
       done;

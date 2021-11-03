@@ -98,15 +98,13 @@ let rec live env i finally =
       finally
   | Ireturn _ | Iop(Itailcall_ind) | Iop(Itailcall_imm _) ->
       Mach.update i ~live:Reg.Set.empty; (* no regs are live across *)
-      Mach.arg_regset i
+      Mach.arg_regset i.operands
   | Iop op ->
       let after = live env i.next finally in
       if Proc.op_is_pure op                    (* no side effects *)
       && Reg.disjoint_set_array after i.res    (* results are not used after *)
       && not (Proc.regs_are_volatile
-                (Mach.arg_regset i
-                 |> Reg.Set.elements
-                 |> Array.of_list))            (* no stack-like hard reg *)
+                (Mach.arg_regset i.operands))      (* no stack-like hard reg *)
       && not (Proc.regs_are_volatile i.res)    (*            is involved *)
       then begin
         (* This operation is dead code.  Ignore its arguments. *)

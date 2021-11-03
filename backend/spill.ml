@@ -210,7 +210,7 @@ let rec reload env i before =
       (i, before, env)
   | Ireturn _ | Iop Itailcall_ind | Iop(Itailcall_imm _) ->
       let env, i =
-        add_reloads env (Reg.Set.inter before i.arg) i
+        add_reloads env (Reg.Set.inter before i.operands) i
       in
        (i, Reg.Set.empty, env)
   | Iop(Icall_ind | Icall_imm _ | Iextcall { alloc = true; }) ->

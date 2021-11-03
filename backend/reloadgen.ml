@@ -127,7 +127,7 @@ method reload_operation op res operands =
     (operands, res)
   | Iopaque ->
       (* arg = result, can be on stack or register *)
-      assert (Mach.arg_reg operands.(0).stamp = res.(0).stamp);
+      assert (Mach.arg_reg operands.(0)).stamp = res.(0).stamp;
       (operands, res)
   | _ ->
       (self#makeregs_operands operands, self#makeregs res)

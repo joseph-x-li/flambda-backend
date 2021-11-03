@@ -522,12 +522,8 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
         gt = get_dest lbl2
       }
     in
-    let operands =
-      match Array.length i.operands with
-      | 0 -> [| Mach.Ireg 0; Mach.Iimm 1 |]
-      | 1 -> [| i.operands.(0); Mach.Iimm 1 |]
-      | _ -> assert false
-    in
+    assert (Array.length i.operands = 1);
+    let operands = [| i.operands.(0); Mach.Iimm 1 |] in
     add_terminator t block { i with operands } (Int_test it) ~trap_depth ~traps;
     create_blocks t fallthrough.insn block ~trap_depth ~traps
   | Lswitch labels ->

@@ -138,15 +138,9 @@ let test tst ppf arg =
   | Itruetest -> operand ppf arg.(0)
   | Ifalsetest -> fprintf ppf "not %a" operand arg.(0)
   | Iinttest cmp ->
-      if Array.length ops = 0 then begin
-        assert (Array.length arg = 2);
-        fprintf ppf "%a%s%a" operand arg.(0) (intcomp cmp) operand arg.(1)
-      end else begin
-        fprintf ppf "%s (%a)" (intcomp cmp) operands ops;
-      end
+      fprintf ppf "%a%s%a" operand arg.(0) (intcomp cmp) operand arg.(1)
   | Ifloattest cmp ->
-      fprintf ppf "%a%s%a"
-       operand arg.(0) (floatcomp cmp) operand arg.(1)
+      fprintf ppf "%a%s%a" operand arg.(0) (floatcomp cmp) operand arg.(1)
   | Ieventest -> fprintf ppf "%a & 1 == 0" operand arg.(0)
   | Ioddtest -> fprintf ppf "%a & 1 == 1" operand arg.(0)
 

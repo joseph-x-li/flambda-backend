@@ -301,9 +301,8 @@ method private add_instruction ready_queue instr =
   for i = 0 to Array.length destroyed - 1 do
     Hashtbl.add code_results destroyed.(i).loc node  (* PR#5731 *)
   done;
-  for i = 0 to Array.length instr.arg - 1 do
-    Hashtbl.add code_uses instr.arg.(i).loc node
-  done;
+  Reg.Set.iter (fun r -> Hashtbl.add code_uses r.loc node)
+    (Mach.arg_regset instr.operands);
   (* If this is a root instruction (all arguments already computed),
      add it to the ready queue *)
   if node.ancestors = 0 then node :: ready_queue else ready_queue

@@ -145,7 +145,7 @@ module Operands : sig
   val mem : Cmm.memory_chunk -> Arch.addressing_mode ->
     index:int -> len:int -> operand_builder
   val reg : index:int -> operand_builder
-  val imm : int -> operand_builder
+  val imm : Targetint.t -> operand_builder
   val immf : int64 -> operand_builder
 
   val selected : operand_builder array -> t

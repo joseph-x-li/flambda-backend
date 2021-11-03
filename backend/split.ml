@@ -41,7 +41,7 @@ let subst_reg_in_operand o (sub : subst) =
   match o with
   | Ireg r -> Ireg (subst_reg r sub)
   | Iimm _ | Iimmf _ -> o
-  | Imem (c,a,rv) -> Imem (c,a,subst_regs rv sub)
+  | Imem (c,a,rv) -> Imem (c,a,subst_regs rv (Some sub))
 
 let subst_regs_in_operands v sub =
   match sub with
@@ -139,7 +139,7 @@ let rec rename i sub =
     Iend ->
       (i, sub)
   | Ireturn _ | Iop(Itailcall_ind) | Iop(Itailcall_imm _) ->
-      (instr_cons_debug i.desc (subst_regs i.arg sub) [||] i.operands
+      (instr_cons_debug i.desc (subst_regs_operands i.operands sub) [||]
          i.dbg i.next, None)
   | Iop Ireload when i.res.(0).loc = Unknown ->
       begin match sub with
@@ -154,8 +154,8 @@ let rec rename i sub =
       end
   | Iop _ ->
       let (new_next, sub_next) = rename i.next sub in
-      (instr_cons_debug i.desc (subst_regs i.arg sub) (subst_regs i.res sub)
-                        i.operands
+      (instr_cons_debug i.desc (subst_regs_operands i.operands sub)
+         (subst_regs i.res sub)
                         i.dbg new_next,
        sub_next)
   | Iifthenelse(tst, ifso, ifnot) ->
@@ -164,7 +164,7 @@ let rec rename i sub =
       let (new_next, sub_next) =
         rename i.next (merge_substs sub_ifso sub_ifnot i.next) in
       (instr_cons (Iifthenelse(tst, new_ifso, new_ifnot))
-                  (subst_regs i.arg sub) [||] i.operands new_next,
+                  (subst_regs_operands i.operands sub) [||] new_next,
        sub_next)
   | Iswitch(index, cases) ->
       let new_sub_cases = Array.map (fun c -> rename c sub) cases in
@@ -172,7 +172,7 @@ let rec rename i sub =
         merge_subst_array (Array.map (fun (_n, s) -> s) new_sub_cases) i.next in
       let (new_next, sub_next) = rename i.next sub_merge in
       (instr_cons (Iswitch(index, Array.map (fun (n, _s) -> n) new_sub_cases))
-                  (subst_regs i.arg sub) [||] i.operands new_next,
+                  (subst_regs_operands i.operands sub) [||] new_next,
        sub_next)
   | Icatch(rec_flag, ts, handlers, body) ->
       let new_subst =
@@ -211,7 +211,7 @@ let rec rename i sub =
          [||] [||] [||] new_next,
        sub_next)
   | Iraise k ->
-      (instr_cons_debug (Iraise k) (subst_regs i.arg sub) [||] i.operands
+      (instr_cons_debug (Iraise k) (subst_regs_operands i.operands sub) [||]
          i.dbg i.next,
        None)
 

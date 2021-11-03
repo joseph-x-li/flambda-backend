@@ -386,7 +386,7 @@ let max_register_pressure i =
   | Istore(Single, _, _) ->
     (match i.operands.(1) with
      | Imem (Single,_,_) -> consumes ~int:0 ~float:1
-     | Imem (_,_,_) -> -> consumes ~int:0 ~float:0
+     | Imem (_,_,_) -> consumes ~int:0 ~float:0
      | Iimm _ | Iimmf _ | Iref _ ->
        Misc.fatal_error "Proc.destroyed_at_oper Istore")
   | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr

@@ -248,21 +248,12 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
         let cond_successor_labels = Label.Set.remove last successor_labels in
         (* Lcondbranch3 is emitted as an unsigned comparison, see ocaml PR
            #8677 *)
-        let imm =
-          match Array.length terminator.operands with
-          | 0 -> None
-          | 2 -> (
-            match terminator.operands.(1) with
-            | Iimm n -> Some n
-            | Iimmf _ -> assert false
-            | Ireg _ | Imem _ -> None)
-          | _ -> assert false
+        let imm1 =
+          match terminator.operands.(1) with
+          | Iimm Targetint.one -> true
+          | Iimmf _ | Ireg | _ | Imem -> false
         in
-        let can_emit_Lcondbranch3 =
-          match is_signed, imm with
-          | false, Some 1 -> true
-          | false, Some _ | false, None | true, _ -> false
-        in
+        let can_emit_Lcondbranch3 = not is_signed && imm_1 in
         if Label.Set.cardinal cond_successor_labels = 2 && can_emit_Lcondbranch3
         then
           (* generates one cmp instruction for all conditional jumps here *)

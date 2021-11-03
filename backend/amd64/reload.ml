@@ -102,7 +102,7 @@ method private one_stack arg =
 
 method private one_mem_or_stack operands =
   (* First operand must be Ireg *)
-  let r = (Mach.arg_reg operands.(0))
+  let r = Mach.arg_reg operands.(0) in
   if Reg.is_stack r then
     match operands.(1) with
     | Ireg r' when Reg.is_stack r' ->

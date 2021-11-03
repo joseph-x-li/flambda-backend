@@ -405,7 +405,7 @@ let imm : 'a Cfg.instruction -> index:int -> Targetint.t option =
 
 let special_immediates expected result =
   match imm expected ~index:1, imm result ~index:1 with
-  | Some imm1, Some imm2 -> Targetint.(equal imm1 (pred imm2))
+  | Some imm1, Some imm2 -> Targetint.equal imm1 (Targetint.pred imm2)
   | None, _ | _, None -> false
 
 let check_terminator_instruction :
@@ -447,7 +447,7 @@ let check_terminator_instruction :
       when Bool.equal is_signed1 is_signed2
            && special_immediates expected result
            && Label.equal lt1 eq1 && Label.equal eq2 gt2
-           && array_equal equal_operand expected.operands.(0)
+           && array_equal Mach.equal_operand expected.operands.(0)
                 result.operands.(0) ->
       check_arg := false;
       State.add_to_explore state location lt1 lt2;

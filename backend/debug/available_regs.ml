@@ -79,7 +79,7 @@ let check_invariants (instr : M.instruction) ~(avail_before : RAS.t) =
     end;
     (* Every register that is an input to an instruction should be
        available. *)
-    let args = Mach.arg_regset instr in
+    let args = Mach.arg_regset instr.operands in
     let avail_before_fdi = RD.Set.forget_debug_info avail_before in
     if not (R.Set.subset args avail_before_fdi) then begin
       Misc.fatal_errorf "Instruction has unavailable input register(s): \

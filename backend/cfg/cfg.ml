@@ -268,23 +268,10 @@ let dump_terminator ppf ?(sep = "\n") ti =
     fprintf ppf "if > goto %d%s" gt sep;
     fprintf ppf "if uo goto %d%s" uo sep
   | Int_test { lt; eq; gt; is_signed } ->
-    let cmp = if is_signed then " s" else " u" in
-    let cmp =
-      if Array.length ti.operands = 0
-      then cmp
-      else
-        Array.fold_left
-          (fun cmp operand ->
-            match (operand : Mach.operand) with
-            | Iimm n -> Format.asprintf "%s imm %a" cmp Targetint.print n
-            | Iimmf f -> Printf.sprintf "%s immf %f" cmp (Int64.float_of_bits f)
-            | Ireg j -> Format.asprintf "%s reg %s" cmp Printmach.reg r
-            | Imem _ -> Printf.sprintf "%s mem" cmp)
-          cmp ti.operands
-    in
-    fprintf ppf "if <%s goto %d%s" cmp lt sep;
-    fprintf ppf "if =%s goto %d%s" cmp eq sep;
-    fprintf ppf "if >%s goto %d%s" cmp gt sep
+    let signed = if is_signed then " s" else " u" in
+    fprintf ppf "if <%s %a goto %d%s" signed Printmach.operands ti.operands lt sep;
+    fprintf ppf "if =%s %a goto %d%s" signed Printmach.operands ti.operands eq sep;
+    fprintf ppf "if >%s %a goto %d%s" signed Printmach.operands ti.operands gt sep
   | Switch labels ->
     fprintf ppf "switch%s" sep;
     for i = 0 to Array.length labels - 1 do
