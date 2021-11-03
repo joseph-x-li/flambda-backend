@@ -56,7 +56,7 @@ let rec deadcode i =
       && not (Proc.regs_are_volatile
                (Mach.arg_regset i.operands))
       && not (Proc.regs_are_volatile
-               (Reg.set_of_array i.res) (* no stack-like hard reg is involved *)
+               (Reg.set_of_array i.res)) (* no stack-like hard reg is involved *)
       then begin
         assert (Array.length i.res > 0);  (* sanity check *)
         s

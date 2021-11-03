@@ -523,7 +523,7 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
       }
     in
     assert (Array.length i.operands = 1);
-    let operands = [| i.operands.(0); Mach.Iimm 1 |] in
+    let operands = [| i.operands.(0); Mach.Iimm Targetint.one |] in
     add_terminator t block { i with operands } (Int_test it) ~trap_depth ~traps;
     create_blocks t fallthrough.insn block ~trap_depth ~traps
   | Lswitch labels ->

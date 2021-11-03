@@ -167,7 +167,7 @@ let operation op ppf res arg =
        (Printcmm.chunk chunk) (Arch.print_addressing reg addr)
        (Array.map Mach.arg_reg arg)
   | Istore is_assign ->
-      fprintf ppf "%s[%a] := %a %s" operand arg.(1) operand arg.(0)
+      fprintf ppf "%a := %a %s" operand arg.(1) operand arg.(0)
        (if is_assign then "(assign)" else "(init)")
   | Ialloc { bytes = n; } ->
     fprintf ppf "alloc %i" n;

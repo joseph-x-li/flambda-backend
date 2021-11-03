@@ -309,7 +309,7 @@ let destroyed_at_oper i =
   | Iop(Iintop(Idiv | Imod))
         -> [| rax; rdx |]
   | Iop(Istore _) ->
-    (match Mach.arg_mem i.operand.(1) with
+    (match i.operand.(1) with
      | Imem (Single, _, _) ->  [| rxmm15 |]
      | Imem (_,_,_) ->
        if fp then

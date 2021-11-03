@@ -246,13 +246,13 @@ let linearize_terminator cfg (terminator : Cfg.terminator Cfg.instruction)
             Label.Set.min_elt successor_labels
         in
         let cond_successor_labels = Label.Set.remove last successor_labels in
-        (* Lcondbranch3 is emitted as an unsigned comparison, see ocaml PR
-           #8677 *)
         let imm1 =
           match terminator.operands.(1) with
           | Iimm Targetint.one -> true
           | Iimmf _ | Ireg | _ | Imem -> false
         in
+        (* Lcondbranch3 is emitted as an unsigned comparison, see ocaml PR
+           #8677 *)
         let can_emit_Lcondbranch3 = not is_signed && imm_1 in
         if Label.Set.cardinal cond_successor_labels = 2 && can_emit_Lcondbranch3
         then

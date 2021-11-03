@@ -68,7 +68,7 @@ let instr ppf i =
   | Lpoptrap ->
       fprintf ppf "pop trap"
   | Lraise k ->
-      fprintf ppf "%s %a" (Lambda.raise_kind k) operand i.operand.(0)
+      fprintf ppf "%s %a" (Lambda.raise_kind k) operand i.operands.(0)
   end;
   if not (Debuginfo.is_none i.dbg) && !Clflags.locations then
     fprintf ppf " %s" (Debuginfo.to_string i.dbg)

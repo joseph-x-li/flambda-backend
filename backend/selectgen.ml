@@ -678,7 +678,7 @@ method virtual select_addressing :
 (* Default instruction selection for stores (of words) *)
 
 method select_store is_assign addr arg =
-  (Istore is_assign, arg, Ireg 0)
+  (Istore is_assign, arg, Operands.reg 0)
 
 (* call marking methods, documented in selectgen.mli *)
 val contains_calls = ref false

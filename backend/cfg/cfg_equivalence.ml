@@ -447,7 +447,7 @@ let check_terminator_instruction :
       when Bool.equal is_signed1 is_signed2
            && special_immediates expected result
            && Label.equal lt1 eq1 && Label.equal eq2 gt2
-           && array_equal Mach.equal_operand expected.operands.(0)
+           && Mach.equal_operand expected.operands.(0)
                 result.operands.(0) ->
       check_arg := false;
       State.add_to_explore state location lt1 lt2;

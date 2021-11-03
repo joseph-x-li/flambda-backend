@@ -108,6 +108,17 @@ let is_critical critical_outputs results =
   with Exit ->
     true
 
+let is_critical critical_outputs results =
+  try
+    for i = 0 to Array.length results - 1 do
+      let r = results.(i).loc in
+      if Reg.Set.exists (Reg.same_loc r) critical_outputs then
+        raise Exit
+    done;
+    false
+  with Exit ->
+    true
+
 let rec longest_path critical_outputs node =
   if node.length < 0 then begin
     match node.sons with
@@ -375,11 +386,13 @@ method schedule_fundecl f =
     else begin
       let critical_outputs =
         match i.desc with
-          Lop(Icall_ind | Itailcall_ind) -> [| i.arg.(0) |]
+          Lop(Icall_ind | Itailcall_ind) -> [| i.operands.(0) |]
         | Lop(Icall_imm _ | Itailcall_imm _ | Iextcall _ | Iprobe _) -> [||]
         | Lreturn -> [||]
-        | _ -> i.arg in
-      List.iter (fun x -> ignore (longest_path critical_outputs x)) ready_queue;
+        | _ -> i.operands in
+      List.iter (fun x ->
+          ignore (longest_path (Mach.arg_regset critical_outputs) x))
+        ready_queue;
       self#reschedule ready_queue 0 (schedule i try_nesting)
     end in
 
