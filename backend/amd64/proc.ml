@@ -370,45 +370,50 @@ let safe_register_pressure = function
     -> if fp then 10 else 11
 
 (* CR gyorsh: derive max_register_pressure from destroyed_at_oper *)
-let max_register_pressure op operands =
+let max_register_pressure i =
   let consumes ~int ~float =
     if fp
     then [| 12 - int; 16 - float |]
     else [| 13 - int; 16 - float |]
-  in match op with
-    Iextcall _ ->
-    if win64
+  in match i.desc with
+  | Iop op ->
+    (match op with
+    |  Iextcall _ ->
+      if win64
       then consumes ~int:5 ~float:6
       else consumes ~int:9 ~float:16
-  | Iintop(Idiv | Imod) ->
-    consumes ~int:2 ~float:0
-  | Ialloc _ ->
-    consumes ~int:(1 + num_destroyed_by_plt_stub) ~float:0
-  | Iintop(Icomp _) ->
-    consumes ~int:1 ~float:0
-  | Istore _ ->
-    (match operands.(1) with
-     | Imem (Single,_,_) -> consumes ~int:0 ~float:1
-     | Imem ((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-            | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
-            | Double),_,_) -> consumes ~int:0 ~float:0
-     | Iimm _ | Iimmf _ | Iref _ ->
-       Misc.fatal_error "Proc.destroyed_at_oper Istore")
-  | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
-           | Ipopcnt|Iclz _| Ictz _|Icheckbound)
-  | Imove | Ispill | Ireload
-  | Ifloatop (Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf)
-  | Ifloatofint | Iintoffloat | Iconst_int _ | Iconst_float _ | Iconst_symbol _
-  | Icall_ind | Icall_imm _ | Itailcall_ind | Itailcall_imm _
-  | Istackoffset _ | Iload (_, _)
-  | Ispecific(Ilea _ | Isextend32 | Izextend32 | Iprefetch _
-             | Irdtsc | Irdpmc | Icrc32q
-             | Ifloat_round _
-             | Ifloat_iround | Ifloat_min | Ifloat_max
-             | Ioffset_loc (_, _)
-             | Ibswap _ | Isqrtf)
-  | Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ | Iopaque
-    -> consumes ~int:0 ~float:0
+    | Iintop(Idiv | Imod) ->
+      consumes ~int:2 ~float:0
+    | Ialloc _ ->
+      consumes ~int:(1 + num_destroyed_by_plt_stub) ~float:0
+    | Iintop(Icomp _) ->
+      consumes ~int:1 ~float:0
+    | Istore _ ->
+      (match operands.(1) with
+       | Imem (Single,_,_) -> consumes ~int:0 ~float:1
+       | Imem ((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+               | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
+               | Double),_,_) -> consumes ~int:0 ~float:0
+       | Iimm _ | Iimmf _ | Iref _ ->
+         Misc.fatal_error "Proc.destroyed_at_oper Istore")
+    | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
+            | Ipopcnt|Iclz _| Ictz _|Icheckbound)
+    | Imove | Ispill | Ireload
+    | Ifloatop (Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf)
+    | Ifloatofint | Iintoffloat | Iconst_int _ | Iconst_float _ | Iconst_symbol _
+    | Icall_ind | Icall_imm _ | Itailcall_ind | Itailcall_imm _
+    | Istackoffset _ | Iload (_, _)
+    | Ispecific(Ilea _ | Isextend32 | Izextend32 | Iprefetch _
+               | Irdtsc | Irdpmc | Icrc32q
+               | Ifloat_round _
+               | Ifloat_iround | Ifloat_min | Ifloat_max
+               | Ioffset_loc
+               | Ibswap _ | Isqrtf)
+    | Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ | Iopaque
+      -> consumes ~int:0 ~float:0)
+  | Iend | Ireturn _ | Iifthenelse (_, _, _) | Icatch (_, _, _, _)
+  | Iexit _ | Iraise _ ->
+    Misc.fatal_error "Proc.max_register_pressure: unexpected op"
 
 (* Pure operations (without any side effect besides updating their result
    registers). *)

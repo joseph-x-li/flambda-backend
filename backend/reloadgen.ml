@@ -166,7 +166,7 @@ method private reload i k =
           self#reload i.next (fun next ->
             k (insert_moves_operands i.operands newarg
                  (instr_cons (Iifthenelse(tst, ifso, ifnot))
-                    newarg [||] i.operands next)))))
+                    [||] newarg next)))))
   | Iswitch(index, cases) ->
       let newarg = self#makeregs_operands i.operand in
       let cases = Array.map (fun case -> self#reload case Fun.id) cases in

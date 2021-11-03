@@ -158,14 +158,14 @@ let same_loc operand reg =
     false
   | Ireg r -> Reg.same_loc r reg
 
-let instr_cons d r o n =
+let instr_cons d o r n =
   { desc = d; next = n; res = r; operands = o;
     dbg = Debuginfo.none; live = Reg.Set.empty;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;
     available_across = None;
   }
 
-let instr_cons_debug d r o dbg n =
+let instr_cons_debug d o r dbg n =
   { desc = d; next = n; res = r; dbg = dbg; live = Reg.Set.empty;
     operands = o;
     available_before = Reg_availability_set.Ok Reg_with_debug_info.Set.empty;

@@ -139,7 +139,7 @@ let rec live env i finally =
         Reg.Set.union (live env ifso at_join) (live env ifnot at_join)
       in
       Mach.update i ~live:at_fork;
-      Reg.Set.union at_fork (Mach.arg_regset i)
+      Reg.Set.union at_fork (Mach.arg_regset .operandsi)
   | Iswitch(_index, cases) ->
       let at_join = live env i.next finally in
       let at_fork = ref Reg.Set.empty in
@@ -147,7 +147,7 @@ let rec live env i finally =
         at_fork := Reg.Set.union !at_fork (live env cases.(i) at_join)
       done;
       Mach.update i ~live:!at_fork;
-      Reg.Set.union !at_fork (Mach.arg_regset i)
+      Reg.Set.union !at_fork (Mach.arg_regset i.operands)
   | Icatch(rec_flag, ts, handlers, body) ->
       let at_join = live (env_from_trap_stack env ts) i.next finally in
       let aux env (nfail, ts, handler) (nfail', before_handler) =
@@ -226,7 +226,7 @@ let rec live env i finally =
       before_body
   | Iraise _ ->
       Mach.update i ~live:env.at_raise;
-      Reg.Set.union env.at_raise (Mach.arg_regset i)
+      Reg.Set.union env.at_raise (Mach.arg_regset i.operands)
 
 let fundecl f =
   reset_cache ();

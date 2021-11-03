@@ -79,11 +79,6 @@ let is_immediate operands ~index =
   else
     false
 
-let is_stack operands ~index =
-    match operands.(index) with
-    | Iimm _ | Iimmf _ -> false
-    | Ireg r -> stackp r
-    | Imem _ -> assert false
 
 (* let same_loc_arg0_res0 res operands =
  *   match operands.(0) with
@@ -119,13 +114,14 @@ method private one_mem_or_stack operands =
 
 (* First argument (= result) must be in register, second arg
          can reside in the stack or memory or immediate *)
-method private same_reg_res0_arg0 arg res operands =
-  if is_stack arg operands ~index:0
-  then begin
-    let r = self#makereg arg.(0) in
-    arg.(0) <- r;
-    (arg, [|r|])
-  end else (arg, res)
+method private same_reg_res0_arg0 res operands =
+  match operands.(0) with
+  | Ireg r when Reg.is_stack r ->
+    let r' = self#makereg r in
+    operands.(0) <- Ireg r';
+    (arg, [|r'|])
+  | Ireg _ | Iimm _ | Iimmf _ | Imem _ ->
+    (operands, res)
 
 method! reload_operation op res operands =
   let arg = self#force_reg_for_mem_operands arg operands in

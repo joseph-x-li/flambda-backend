@@ -186,7 +186,8 @@ let print_specific_operation_name op =
   | Icrc32q -> "crc32"
   | Iprefetch _ -> "prefetch"
 
-let print_specific_operation printreg printoperand op ppf arg =
+let print_specific_operation printreg
+      (printoperand: Format.formatter -> 'a -> unit) op ppf (arg : 'a array) =
   match op with
   | Ilea addr -> print_addressing printreg addr ppf arg
   | Ioffset_loc ->

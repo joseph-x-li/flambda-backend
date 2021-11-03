@@ -97,27 +97,8 @@ let add_WAW_dependencies node res =
    immediately following the basic block (a "critical" output). *)
 
 let is_critical critical_outputs results =
-  try
-    for i = 0 to Array.length results - 1 do
-      let r = results.(i).loc in
-      for j = 0 to Array.length critical_outputs - 1 do
-        if critical_outputs.(j).loc = r then raise Exit
-      done
-    done;
-    false
-  with Exit ->
-    true
-
-let is_critical critical_outputs results =
-  try
-    for i = 0 to Array.length results - 1 do
-      let r = results.(i).loc in
-      if Reg.Set.exists (Reg.same_loc r) critical_outputs then
-        raise Exit
-    done;
-    false
-  with Exit ->
-    true
+  Array.exists (fun r -> Reg.Set.exists (Reg.same_loc r) critical_outputs)
+    results
 
 let rec longest_path critical_outputs node =
   if node.length < 0 then begin

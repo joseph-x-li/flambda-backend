@@ -156,10 +156,10 @@ val same_loc : operand -> Reg.t -> bool
 val dummy_instr: instruction
 val end_instr: unit -> instruction
 val instr_cons:
-      instruction_desc -> Reg.t array -> operand array ->
+      instruction_desc -> operand array -> Reg.t array ->
       instruction -> instruction
 val instr_cons_debug:
-      instruction_desc -> Reg.t array -> operand array ->
+      instruction_desc -> operand array -> Reg.t array ->
       Debuginfo.t -> instruction -> instruction
 val instr_iter: (instruction -> unit) -> instruction -> unit
 
