@@ -1479,67 +1479,38 @@ method insert_move_extcall_arg env _ty_arg src dst =
      for example a "32-bit move" instruction for int32 arguments. *)
   self#insert_moves env src dst
 
-(* method emit_stores env data regs_for_addr =
- *   let a =
- *     ref (Arch.offset_addressing Arch.identity_addressing (-Arch.size_int)) in
- *   List.iter
- *     (fun e ->
- *       let (op, arg, operands_for_newval) = self#select_store false !a e in
- *       (* let mach_operands_for_new_val = Operands.emit operands regs_addr in *)
- *       match self#emit_expr env arg with
- *       | None -> assert false
- *         (* CR gyorsh: this can now probably be reachable if [e] is a constant
- *            handled by the target. *)
- *       | Some regs ->
- *           match op with
- *             Istore _ ->
- *               for i = 0 to Array.length regs - 1 do
- *                 let r = regs.(i) in
- *                 let kind = if r.typ = Float then Double else Word_val in
- *                 self#insert env
- *                             (Iop(Istore(kind, !a, false)))
- *                             (Array.append [|Ireg r|] operands) [||];
- *                 a := Arch.offset_addressing !a (size_component r.typ)
- *               done
- *           | _ ->
- *               self#insert env (Iop op) (Array.append regs_addr regs) [||]
- *                 (Operands.in_registers ());
- *               a := Arch.offset_addressing !a (size_expr env e))
- *     data *)
-
 method emit_stores env data regs_for_addr =
+  let len = Array.length regs_for_addr in
   let a =
     ref (Arch.offset_addressing Arch.identity_addressing (-Arch.size_int)) in
+  let emit_store op regs_for_e operands_for_e chunk new_size =
+    assert (Array.legnth operands_for_e > 0);
+    let operands_for_addr =
+      Operands.mem chunk !a ~index:(Array.length regs) ~len in
+    let operands = Array.append operands_for_e operands_for_addr in
+    let regs = Array.append regs_for_e regs_for_addr in
+    let mach_operands = Operands.(emit (selected operands) regs) in
+    self#insert env (Iop op) [||] mach_operands;
+    a := Arch.offset_addressing !a new_size
+  in
   List.iter
     (fun e ->
-       let (op, arg, operands_for_e, chunk) = self#select_store false !a e in
-       let emit_store regs =
-         let mach_operands_for_e = Operands.emit operands_for_e regs in
-         assert (Array.legnth mach_operands_for_e > 0);
-         let mach_operands_for_addr = [| Mach.Imem (chunk,!a,regs_for_addr) |] in
-         let operands = Array.append mach_operands_for_e mach_operands_for_addr in
-         self#insert env (Iop op) [||] operands;
-         a := Arch.offset_addressing !a (size_expr env e)
-       in
-      (* let mach_operands_for_new_val = Operands.emit operands regs_addr in *)
-      match self#emit_expr env arg with
-      | None -> assert false
-      | Some [] ->
-        (* immediate operands or Ispecific operation *)
-        emit_store []
-      | Some regs ->
-          match op with
-            Istore _ ->
-              for i = 0 to Array.length regs - 1 do
-                let r = regs.(i) in
-                let kind = if r.typ = Float then Double else Word_val in
-                let mach_operands_for_addr = [| Mach.Imem (kind,!a,regs_for_addr) |] in
-                let mach_operands_for_e = Operands.emit operands_for_e r in
-                let operands = Array.append mach_operands_for_e mach_operands_for_addr in
-                self#insert env (Iop(Istore false)) operands [||];
-                a := Arch.offset_addressing !a (size_component r.typ)
-              done
-          | _ -> emit_store regs)
+       let (op, newe, operands_for_e, chunk) = self#select_store false !a e in
+       match self#emit_expr env newe with
+       | None -> assert false
+       | Some [] ->
+         (* immediate operands or Ispecific operation *)
+         emit_store op [] operands_for_e chunk (size_expr env e)
+       | Some regs_for_e ->
+         match op with
+           Istore _ ->
+           for i = 0 to Array.length regs_for_e - 1 do
+             let r = regs.(i) in
+             let kind = if r.typ = Float then Double else Word_val in
+             let new_size = size_component r.typ in
+             emit_store op [|r|] [| Ireg 0|] kind new_size
+           done
+         | _ -> emit_store op regs_for_e operands_for_e chunk (size_expr env e))
     data
 
 (* Same, but in tail position *)
