@@ -283,16 +283,15 @@ method select_addressing _chunk exp =
     | Ascaledadd(e1, e2, scale) ->
         (Iindexed2scaled(scale, d), Ctuple[e1; e2], 2)
 
-method! select_store is_assign addr chunk len exp =
+method! select_store is_assign addr exp =
   (* CR gyorsh: can it now be done simply with select_operands? *)
-  let operands n =
-    Operands.(selected [|imm n; mem Word_int addr ~index:1 ~len |])
-  in
   match exp with
     Cconst_int (n, _dbg) when is_immediate n ->
-    (Istore is_assign, Ctuple [], operands (Targetint.of_int n))
+    (Istore is_assign, Ctuple [], [| Operands.imm (Targetint.of_int n) |],
+     Word_int)
   | (Cconst_natint (n, _dbg)) when is_immediate_natint n ->
-    (Istore is_assign, Ctuple [], operands n)
+    (Istore is_assign, Ctuple [], [| Operands.imm n |],
+     Word_int)
   | Cconst_int _
   | Cconst_natint (_, _) | Cconst_float (_, _) | Cconst_symbol (_, _)
   | Cvar _ | Clet (_, _, _) | Clet_mut (_, _, _, _) | Cphantom_let (_, _, _)
@@ -300,7 +299,7 @@ method! select_store is_assign addr chunk len exp =
   | Cifthenelse (_, _, _, _, _, _) | Cswitch (_, _, _, _) | Ccatch (_, _, _)
   | Cexit (_, _, _) | Ctrywith (_, _, _, _, _)
     ->
-      super#select_store is_assign chunk addr len exp
+      super#select_store is_assign addr exp
 
 method select_condition cond =
   match cond with
