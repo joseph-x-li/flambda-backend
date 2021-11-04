@@ -266,7 +266,7 @@ let rec reload env i before =
       in
       (i, finally, env)
   | Iswitch(index, cases) ->
-      let at_fork = Reg.diff before (Mach.arg_regset i.operands) in
+      let at_fork = Reg.Set.diff before (Mach.arg_regset i.operands) in
       let date_fork = env.current_date in
       let new_cases_list, env, after_cases =
         Array.fold_left (fun (new_cases_list, env, after_cases) c ->

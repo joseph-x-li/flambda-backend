@@ -116,7 +116,6 @@ let pseudoregs_for_operation op arg res operands =
       ([| rax; arg.(1) |], [| rdx |])
   | Iintop(Ilsl|Ilsr|Iasr) ->
      (* arg.(0) and res.(0) must be the same *)
-
      if Selectgen.Operands.is_immediate operands ~index:1 then
        same_reg_res0_arg0 arg res
      else
@@ -288,9 +287,11 @@ method! select_store is_assign addr exp =
   (* CR gyorsh: can it now be done simply with select_operands? *)
   match exp with
     Cconst_int (n, _dbg) when is_immediate n ->
-    (Istore is_assign, Ctuple [], [| Iimm (Targetint.of_int n) |])
+    (Istore is_assign, Ctuple [], [| Operands.imm (Targetint.of_int n) |],
+     Word_int)
   | (Cconst_natint (n, _dbg)) when is_immediate_natint n ->
-    (Istore is_assign, Ctuple [], [| Iimm n |])
+    (Istore is_assign, Ctuple [], [| Operands.imm n |],
+     Word_int)
   | Cconst_int _
   | Cconst_natint (_, _) | Cconst_float (_, _) | Cconst_symbol (_, _)
   | Cvar _ | Clet (_, _, _) | Clet_mut (_, _, _, _) | Cphantom_let (_, _, _)

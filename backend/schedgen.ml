@@ -232,7 +232,7 @@ method private instr_issue_cycles instr =
 
 method private destroyed_by_instr instr =
   match instr.desc with
-  | Lop op -> Proc.destroyed_at_oper (Iop op)
+  | Lop op -> Proc.destroyed_at_oper instr
   | Lreloadretaddr -> [||]
   | _ -> assert false
 

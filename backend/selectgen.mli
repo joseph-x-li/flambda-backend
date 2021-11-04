@@ -35,8 +35,8 @@ val size_expr : environment -> Cmm.expression -> int
    once the registers are determined in which the result of
    argument evaluation is place. *)
 module Operands : sig
-  type t         (** a constructor for operand array  *)
-  type operand_builder (** a constructor for operand  *)
+  type t                  (** a constructor for operand array  *)
+  type operand_builder (** a constructor for a single operand  *)
 
   val mem : Cmm.memory_chunk -> Arch.addressing_mode ->
     index:int -> len:int -> operand_builder
@@ -49,6 +49,7 @@ module Operands : sig
   val emit : t -> Reg.t array -> Mach.operand array
 
   val is_immediate : t -> index:int -> bool
+  val append : t -> operand_builder array -> t
 end
 
 module Effect : sig
