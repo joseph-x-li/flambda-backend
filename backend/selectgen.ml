@@ -680,8 +680,10 @@ method virtual select_addressing :
 
 (* Default instruction selection for stores (of words) *)
 
-method select_store is_assign addr arg =
-  (Istore is_assign, arg, Word_val)
+method select_store is_assign chunk addr len arg =
+  let chunk = Option.get chunk ~default:Word_val in
+  (Istore is_assign, arg,
+   Operands.(selected [| reg 0; mem chunk addr ~index:1 ~len  |] )
 
 (* call marking methods, documented in selectgen.mli *)
 val contains_calls = ref false
@@ -739,11 +741,11 @@ method select_operation op args _dbg =
         | Lambda.Assignment -> true
       in
       if chunk = Word_int || chunk = Word_val then begin
-        let (op, newarg2, operands, chunk) = self#select_store is_assign addr arg2 in
-        (op, [newarg2; eloc],
-         Operands.append operands [| mk_mem ~index:(Array.length operands) |])
+        let (op, newarg2, operands) = self#select_store is_assign addr arg2 chunk len in
+        (op, [newarg2; eloc], operands)
       end else begin
-        (Istore is_assign, [arg2; eloc], [| Ireg 0; mk_mem ~index:1 |])
+        (Istore is_assign, [arg2; eloc],
+         [| Ireg 0; Operands.mem chunk addr ~len ~index:1 |])
         (* Inversion addr/datum in Istore *)
       end
   | (Calloc, _) -> (Ialloc {bytes = 0; dbginfo = []}), args,
@@ -1507,21 +1509,55 @@ method insert_move_extcall_arg env _ty_arg src dst =
  *               a := Arch.offset_addressing !a (size_expr env e))
  *     data *)
 
+(* method emit_stores env data regs_for_addr =
+ *   let a =
+ *     ref (Arch.offset_addressing Arch.identity_addressing (-Arch.size_int)) in
+ *   List.iter
+ *     (fun e ->
+ *        let (op, arg, operands_for_e, chunk) = self#select_store false !a e in
+ *        let emit_store regs =
+ *          let mach_operands_for_e = Operands.emit operands_for_e regs in
+ *          assert (Array.legnth mach_operands_for_e > 0);
+ *          let mach_operands_for_addr = [| Mach.Imem (chunk,!a,regs_for_addr) |] in
+ *          let operands = Array.append mach_operands_for_e mach_operands_for_addr in
+ *          self#insert env (Iop op) [||] operands;
+ *          a := Arch.offset_addressing !a (size_expr env e)
+ *        in
+ *       (* let mach_operands_for_new_val = Operands.emit operands regs_addr in *)
+ *       match self#emit_expr env arg with
+ *       | None -> assert false
+ *       | Some [] ->
+ *         (* immediate operands or Ispecific operation *)
+ *         emit_store []
+ *       | Some regs ->
+ *           match op with
+ *             Istore _ ->
+ *               for i = 0 to Array.length regs - 1 do
+ *                 let r = regs.(i) in
+ *                 let kind = if r.typ = Float then Double else Word_val in
+ *                 let mach_operands_for_addr = [| Mach.Imem (kind,!a,regs_for_addr) |] in
+ *                 let mach_operands_for_e = Operands.emit operands_for_e r in
+ *                 let operands = Array.append mach_operands_for_e mach_operands_for_addr in
+ *                 self#insert env (Iop(Istore false)) operands [||];
+ *                 a := Arch.offset_addressing !a (size_component r.typ)
+ *               done
+ *           | _ -> emit_store regs)
+ *     data *)
+
+
 method emit_stores env data regs_for_addr =
+  let len = Array.len regs_for_addr in
   let a =
     ref (Arch.offset_addressing Arch.identity_addressing (-Arch.size_int)) in
   List.iter
     (fun e ->
-       let (op, arg, operands_for_e, chunk) = self#select_store false !a e in
+       let (op, arg, operands) = self#select_store false None !a len e in
        let emit_store regs =
-         let mach_operands_for_e = Operands.emit operands_for_e regs in
-         assert (Array.legnth mach_operands_for_e > 0);
-         let mach_operands_for_addr = [| Mach.Imem (chunk,!a,regs_for_addr) |] in
-         let operands = Array.append mach_operands_for_e mach_operands_for_addr in
-         self#insert env (Iop op) [||] operands;
+         let mach_operands =
+           Operands.emit operands (Array.append regs regs_for_addr) in
+         self#insert env (Iop op) [||] mach_operands;
          a := Arch.offset_addressing !a (size_expr env e)
        in
-      (* let mach_operands_for_new_val = Operands.emit operands regs_addr in *)
       match self#emit_expr env arg with
       | None -> assert false
       | Some [] ->
