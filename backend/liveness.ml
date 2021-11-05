@@ -139,7 +139,7 @@ let rec live env i finally =
         Reg.Set.union (live env ifso at_join) (live env ifnot at_join)
       in
       Mach.update i ~live:at_fork;
-      Reg.Set.union at_fork (Mach.arg_regset .operandsi)
+      Reg.Set.union at_fork (Mach.arg_regset i.operands)
   | Iswitch(_index, cases) ->
       let at_join = live env i.next finally in
       let at_fork = ref Reg.Set.empty in

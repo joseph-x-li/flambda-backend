@@ -51,7 +51,10 @@ val safe_register_pressure: Mach.operation -> int
 val max_register_pressure: Mach.instruction -> int array
 
 (* Registers destroyed by operations *)
-val destroyed_at_oper: Mach.instruction -> Reg.t array
+val destroyed_at_oper:
+  Mach.instruction_desc ->
+  Mach.operand array ->
+  Reg.t array
 val destroyed_at_raise: Reg.t array
 val destroyed_at_reloadretaddr : Reg.t array
 

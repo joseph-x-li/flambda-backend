@@ -911,8 +911,6 @@ let emit_instr fallthrough i =
       assert (same_loc_arg_res0 i ~index:0)
   | Lop(Ispecific(Ilea addr)) ->
       I.lea (addressing addr NONE i 0) (res i 0)
-  | Lop(Ispecific(Istore_int  _)) ->
-      I.mov (arg i 0) (arg i 1)
   | Lop(Ispecific(Ioffset_loc)) ->
       I.add (arg i 1) (arg i 0)
   | Lop(Ispecific(Ibswap 16)) ->

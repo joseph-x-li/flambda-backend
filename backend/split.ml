@@ -64,6 +64,16 @@ let repres_regs rv =
   let n = Array.length rv in
   for i = 0 to n-1 do rv.(i) <- repres_reg rv.(i) done
 
+let repres_reg_operand o =
+  match o with
+  | Ireg r -> Ireg (repres_reg r)
+  | Iimm _ | Iimmf _ -> o
+  | Imem (c,a,rv) -> Imem (c,a,repres_regs rv)
+
+let repres_regs_operands v =
+  let n = Array.length v in
+  for i = 0 to n-1 do v.(i) <- repres_reg_operand v.(i) done
+
 (* Identify two registers.
    The second register is chosen as canonical representative. *)
 
@@ -149,7 +159,7 @@ let rec rename i sub =
           let newr = Reg.clone i.res.(0) in
           let (new_next, sub_next) =
             rename i.next (Some(Reg.Map.add oldr newr s)) in
-          (instr_cons i.desc i.arg [|newr|] i.operands new_next,
+          (instr_cons i.desc i.operands [|newr|] new_next,
            sub_next)
       end
   | Iop _ ->
@@ -195,7 +205,7 @@ let rec rename i sub =
       let new_handlers = List.map2 (fun (nfail, ts, _) (handler, _) ->
           (nfail, ts, handler)) handlers res in
       (instr_cons
-         (Icatch(rec_flag, ts, new_handlers, new_body)) [||] [||] [||]
+         (Icatch(rec_flag, ts, new_handlers, new_body)) [||] [||]
          new_next,
        sub_next)
   | Iexit (nfail, _traps) ->
@@ -208,7 +218,7 @@ let rec rename i sub =
       let (new_next, sub_next) =
         rename i.next (merge_substs sub_body sub_handler i.next) in
       (instr_cons (Itrywith(new_body, kind, (ts, new_handler)))
-         [||] [||] [||] new_next,
+         [||] [||] new_next,
        sub_next)
   | Iraise k ->
       (instr_cons_debug (Iraise k) (subst_regs_in_operands i.operands sub) [||]

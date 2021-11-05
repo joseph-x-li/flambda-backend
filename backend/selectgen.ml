@@ -819,13 +819,13 @@ method select_operands op args =
   (* Immediate operands of integer operations *)
   | [arg; Cconst_int (n, _)]
     when self#is_immediate op n ->
-    let operands = Operands.(selected [|reg 0;imm n|]) in
+    let operands = Operands.(selected [|reg 0;imm (Targetint.of_int n)|]) in
     Operands.report operands op;
     (op, [arg], operands)
   | [Cconst_int (n, _); arg]
     when commutative
       && self#is_immediate (Option.get swap) n ->
-    let operands = Operands.(selected [|reg 0; imm n|]) in
+    let operands = Operands.(selected [|reg 0; imm (Targetint.of_int n)|]) in
     Operands.report operands ~swap:true op;
     ((Option.get swap), [arg], operands)
   (* Immediate operands of float operations *)
@@ -879,13 +879,13 @@ method select_operands_condition op args =
   (* Immediate operands of integer operations *)
   | [arg; Cconst_int (n, _)]
     when self#is_immediate_test op n ->
-    let operands = Operands.(selected [|reg 0; imm n|]) in
+    let operands = Operands.(selected [|reg 0; imm (Targetint.of_int n)|]) in
     Operands.report_test operands op;
     (op, arg, operands)
   | [Cconst_int (n, _); arg]
     when commutative
       && self#is_immediate_test (Option.get swap) n ->
-    let operands = Operands.(selected [|reg 0; imm n|]) in
+    let operands = Operands.(selected [|reg 0; imm (Targetint.of_int n)|]) in
     Operands.report_test operands ~swap:true op;
     ((Option.get swap), arg, operands)
   (* Immediate operands of float operations *)
@@ -996,7 +996,7 @@ method insert_move_results env loc res stacksize =
    to insert moves before and after the operation, i.e. for two-address
    instructions, or instructions using dedicated registers. *)
 
-method insert_op_debug env op dbg rd operands =
+method insert_op_debug env op dbg rd mach_operands =
   self#insert_debug env (Iop op) dbg rd mach_operands;
   rd
 
@@ -1069,8 +1069,9 @@ method emit_expr (env:environment) exp =
         None -> None
       | Some r1 ->
           let rd = [|Proc.loc_exn_bucket|] in
-          self#insert env (Iop Imove) [| Mach.Ireg r1 |] rd;
-          self#insert_debug env  (Iraise k) dbg [| Ireg rd |] [||];
+          self#insert env (Iop Imove) (Array.map (fun r -> Mach.Ireg r) r1) rd;
+          self#insert_debug env  (Iraise k) dbg
+            [| Ireg Proc.loc_exn_bucket |] [||];
           set_traps_for_raise env;
           None
       end
@@ -1079,7 +1080,7 @@ method emit_expr (env:environment) exp =
         None -> None
       | Some (simple_args, env) ->
          let rs = self#emit_tuple env simple_args in
-         Some (self#insert_op_debug env Iopaque dbg [|Mach.Ireg rs|]  rs)
+         Some (self#insert_op_debug env Iopaque dbg [|Mach.Ireg rs|] [|rs|])
       end
   | Cop(op, args, dbg) ->
       begin match self#emit_parts_list env args with

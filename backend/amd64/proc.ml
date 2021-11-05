@@ -301,15 +301,15 @@ let destroyed_at_alloc =
   else
     [| r11 |]
 
-let destroyed_at_oper i =
-  match i.desc with
+let destroyed_at_oper op operands =
+  match op with
     Iop(Icall_ind | Icall_imm _ | Iextcall { alloc = true; }) ->
     all_phys_regs
   | Iop(Iextcall { alloc = false; }) -> destroyed_at_c_call
   | Iop(Iintop(Idiv | Imod))
         -> [| rax; rdx |]
   | Iop(Istore _) ->
-    (match i.operands.(1) with
+    (match operands.(1) with
      | Imem (Single, _, _) ->  [| rxmm15 |]
      | Imem ((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
             | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
@@ -389,12 +389,12 @@ let max_register_pressure i =
     | Iintop(Icomp _) ->
       consumes ~int:1 ~float:0
     | Istore _ ->
-      (match operands.(1) with
+      (match i.operands.(1) with
        | Imem (Single,_,_) -> consumes ~int:0 ~float:1
        | Imem ((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
                | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
                | Double),_,_) -> consumes ~int:0 ~float:0
-       | Iimm _ | Iimmf _ | Iref _ ->
+       | Iimm _ | Iimmf _ | Ireg _ ->
          Misc.fatal_error "Proc.destroyed_at_oper Istore")
     | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
             | Ipopcnt|Iclz _| Ictz _|Icheckbound)

@@ -294,7 +294,8 @@ method! select_store is_assign chunk addr len exp =
   | (Cconst_natint (n, _dbg)) when chunk_for_imm && is_immediate_natint n ->
     (* CR gyorsh: add to Targetint module or
        change Cconst_intnat to take Targetint.t?  *)
-    let targetint_of_nativeint = Int64.of_nativeint in
+    let targetint_of_nativeint n =
+      Int64.of_nativeint n |> Targetint.of_int64 in
     (Istore is_assign, Ctuple [], mk_mem (targetint_of_nativeint n))
   | Cconst_int _
   | Cconst_natint (_, _) | Cconst_float (_, _) | Cconst_symbol (_, _)
@@ -303,7 +304,7 @@ method! select_store is_assign chunk addr len exp =
   | Cifthenelse (_, _, _, _, _, _) | Cswitch (_, _, _, _) | Ccatch (_, _, _)
   | Cexit (_, _, _) | Ctrywith (_, _, _, _, _)
     ->
-      super#select_store is_assign addr exp
+      super#select_store is_assign chunk addr len exp
 
 method select_condition cond =
   match cond with
@@ -364,8 +365,10 @@ method! select_operation op args dbg =
       begin match args with
         [loc; Cop(Caddi, [Cop(Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
         when loc = loc' && is_immediate n ->
-          let (addr, arg, _) = self#select_addressing chunk loc in
-          (Ispecific(Ioffset_loc(n, addr)), [arg], in_reg)
+          let (addr, arg, len) = self#select_addressing chunk loc in
+          (Ispecific Ioffset_loc, [arg],
+           Selectgen.Operands.(selected [| mem chunk addr ~len ~index:0;
+                                           imm (Targetint.of_int n) |]))
       | _ ->
           super#select_operation op args dbg
       end

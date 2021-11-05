@@ -119,7 +119,7 @@ method private same_reg_res0_arg0 res operands =
   | Ireg r when Reg.is_stack r ->
     let r' = self#makereg r in
     operands.(0) <- Ireg r';
-    (arg, [|r'|])
+    (operands, [|r'|])
   | Ireg _ | Iimm _ | Iimmf _ | Imem _ ->
     (operands, res)
 

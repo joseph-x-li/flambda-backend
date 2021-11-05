@@ -24,7 +24,7 @@ let operands rv = Array.map (fun r -> Ireg r) rv
 let insert_move src dst next =
   if src.loc = dst.loc
   then next
-  else instr_cons (Iop Imove) [|dst|] [|Ireg src|] next
+  else instr_cons (Iop Imove) [|Ireg src|] [|dst|] next
 
 let insert_moves src dst next =
   let rec insmoves i =
@@ -166,13 +166,13 @@ method private reload i k =
           self#reload i.next (fun next ->
             k (insert_moves_operands i.operands newarg
                  (instr_cons (Iifthenelse(tst, ifso, ifnot))
-                    [||] newarg next)))))
+                    newarg [||] next)))))
   | Iswitch(index, cases) ->
-      let newarg = self#makeregs_operands i.operand in
+      let newarg = self#makeregs_operands i.operands in
       let cases = Array.map (fun case -> self#reload case Fun.id) cases in
       self#reload i.next (fun next ->
         k (insert_moves_operands i.operands newarg
-             (instr_cons (Iswitch(index, cases)) [||] newarg next)))
+             (instr_cons (Iswitch(index, cases)) newarg [||] next)))
   | Icatch(rec_flag, ts, handlers, body) ->
       let new_handlers = List.map
           (fun (nfail, ts, handler) -> nfail, ts, self#reload handler Fun.id)
