@@ -154,7 +154,6 @@ module Operands : sig
 
   val is_immediate : t -> index:int -> bool
 
-  val append : t -> operand_builder array -> t
   (* CR gyorsh: temporary, stats for testing *)
   val report : t -> ?swap:bool -> Mach.operation -> unit
   val report_test : t -> ?swap:bool -> Mach.test -> unit
@@ -242,8 +241,6 @@ end = struct
   let in_registers () = In_registers
 
   let selected r = Selected r
-
-  let append t r =
 
   let is_immediate t ~index =
     match t with
@@ -682,7 +679,7 @@ method virtual select_addressing :
 
 method select_store is_assign chunk addr len arg =
   (Istore is_assign, arg,
-   Operands.(selected [| reg 0; mem chunk addr len ~index:1 |]))
+   Operands.(selected [| reg 0; mem chunk addr ~len ~index:1 |]))
 
 (* call marking methods, documented in selectgen.mli *)
 val contains_calls = ref false
@@ -809,9 +806,10 @@ method swap_operands op =
     | Imove | Ispill | Ireload | Icall_ind | Itailcall_ind | Iopaque
     | Iconst_int _ | Iconst_float _ | Iconst_symbol _
     | Icall_imm _ | Itailcall_imm _ | Iextcall _
-    | Istackoffset _ | Iload (_, _) | Istore (_, _, _) | Ialloc _
+    | Istackoffset _ | Iload (_, _) | Istore  _ | Ialloc _
     | Ispecific _| Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ -> None
 
+(* CR gyorsh: match on Const_intnat as well? *)
 (* CR gyorsh: unary/binary and separate selection *)
 method select_operands op args =
   let swap = self#swap_operands op in

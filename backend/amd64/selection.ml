@@ -285,14 +285,17 @@ method select_addressing _chunk exp =
 
 method! select_store is_assign chunk addr len exp =
   let chunk_for_imm = chunk = Word_int || chunk = Word_val in
-  (* CR gyorsh: can it now be done simply with select_operands? *)
+  let mk_mem n =
+    Selectgen.Operands.(selected [| imm n;
+                                    mem Word_int addr ~len ~index:0 |]) in
   match exp with
     Cconst_int (n, _dbg) when chunk_for_imm && is_immediate n ->
-    (Istore is_assign, Ctuple [], [| Operands.imm (Targetint.of_int n) |],
-     Word_int)
+    (Istore is_assign, Ctuple [], mk_mem (Targetint.of_int n))
   | (Cconst_natint (n, _dbg)) when chunk_for_imm && is_immediate_natint n ->
-    (Istore is_assign, Ctuple [], [| Operands.imm n |],
-     Word_int)
+    (* CR gyorsh: add to Targetint module or
+       change Cconst_intnat to take Targetint.t?  *)
+    let targetint_of_nativeint = Int64.of_nativeint in
+    (Istore is_assign, Ctuple [], mk_mem (targetint_of_nativeint n))
   | Cconst_int _
   | Cconst_natint (_, _) | Cconst_float (_, _) | Cconst_symbol (_, _)
   | Cvar _ | Clet (_, _, _) | Clet_mut (_, _, _, _) | Cphantom_let (_, _, _)
