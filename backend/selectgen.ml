@@ -681,7 +681,7 @@ method virtual select_addressing :
 (* Default instruction selection for stores (of words) *)
 
 method select_store is_assign addr arg =
-  (Istore is_assign, arg, [| Operands.reg 0 |], Word_val)
+  (Istore is_assign, arg, Operands.in_registers (), Word_val)
 
 (* call marking methods, documented in selectgen.mli *)
 val contains_calls = ref false
@@ -743,8 +743,8 @@ method select_operation op args _dbg =
           self#select_store is_assign addr arg2 in
         let index = Array.length operands_for_arg2 in
         (op, [newarg2; eloc],
-         Operands.selected (Array.append operands_for_arg2
-                              [| Operands.mem chunk addr ~index ~len |])
+         Operands.append operands_for_arg2
+           [| Operands.mem chunk addr ~index ~len |])
       end else begin
         (Istore is_assign, [arg2; eloc],
          Operands.(selected [| reg 0; mem chunk addr ~index:1 ~len |])
