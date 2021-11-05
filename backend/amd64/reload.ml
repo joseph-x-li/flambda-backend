@@ -123,24 +123,24 @@ method private same_reg_res0_arg0 res operands =
   | Ireg _ | Iimm _ | Iimmf _ | Imem _ ->
     (operands, res)
 
-method! reload_operation op res operands =
-  let arg = self#makeregs_for_memory_operands operands in
+method! reload_operation op res arg =
+  let arg = self#makeregs_for_memory_operands arg in
   match op with
-  | Iintop(Iadd) when (not (Reg.same_loc (Mach.arg_reg operands.(0)) res.(0)))
-                      && is_immediate operands ~index:1 ->
+  | Iintop(Iadd) when (not (Reg.same_loc (Mach.arg_reg arg.(0)) res.(0)))
+                      && is_immediate arg ~index:1 ->
       (* This add will be turned into a lea; args and results must be
          in registers *)
-      super#reload_operation op res operands
+      super#reload_operation op res arg
   | Iintop(Iadd|Isub|Iand|Ior|Ixor|Icheckbound) ->
       (* One of the two arguments can reside in the stack or memory, but not both *)
-      (self#one_mem_or_stack operands, res)
+      (self#one_mem_or_stack arg, res)
   | Iintop (Icomp _) ->
       (* One of the two arguments can reside in the stack, but not both.
          The result must be in a register. *)
       let res =
         if stackp res.(0) then [| self#makereg res.(0) |] else res
       in
-      (self#one_mem_or_stack operands, res)
+      (self#one_mem_or_stack arg, res)
   | Ispecific Ifloat_iround
   | Ispecific (Ifloat_round _) ->
       (* The argument(s) can be either in register or on stack.
@@ -157,7 +157,7 @@ method! reload_operation op res operands =
   | Iintop(Imul) | Ifloatop (Iaddf | Isubf | Imulf | Idivf) ->
       (* First argument (= result) must be in register, second arg
          can reside in the stack *)
-      self#same_reg_res0_arg0 res operands
+      self#same_reg_res0_arg0 res arg
   | Ispecific (Irdtsc | Irdpmc) ->
       (* Irdtsc: result must be in register.
          Irdpmc: result must be in register, arg.(0) already forced in reg. *)
@@ -168,7 +168,7 @@ method! reload_operation op res operands =
   | Ispecific Icrc32q ->
     (* First argument and result must be in the same register.
        Second argument can be either in a register or on stack. *)
-      self#same_reg_res0_arg0 res operands
+      self#same_reg_res0_arg0 res arg
   | Ifloatop(Icompf _) ->
     (* First argument is forced to be the same as the second result,
        and it must be in register. *)
@@ -181,15 +181,15 @@ method! reload_operation op res operands =
   | Iconst_int n ->
       if n <= 0x7FFFFFFFn && n >= -0x80000000n
       then (arg, res)
-      else super#reload_operation op arg res operands
+      else super#reload_operation op res arg
   | Iconst_symbol _ ->
       if !Clflags.pic_code || !Clflags.dlcode || Arch.win64
-      then super#reload_operation op arg res operands
+      then super#reload_operation op res arg
       else (arg, res)
   | Iintop (Ipopcnt | Iclz _| Ictz _) ->
       (* Result must be in register, but argument can be on stack *)
       (arg, (if stackp res.(0) then [| self#makereg res.(0) |] else res))
-  | Ispecific  (Isqrtf | Isextend32 | Izextend32 | Ilea _
+  | Ispecific  (Isqrtf | Isextend32 | Izextend32 | Ilea
                | Ioffset_loc
                | Iprefetch _
                | Ibswap _)
@@ -199,7 +199,7 @@ method! reload_operation op res operands =
   | Istore  _|Ialloc _|Iname_for_debugger _|Iprobe _|Iprobe_is_enabled _
   | Iopaque
     -> (* Other operations: all args and results in registers *)
-      super#reload_operation op arg res operands
+      super#reload_operation op res arg
 
 method! reload_test tst operands =
   let operands = self#makeregs_for_mem_operands operands in

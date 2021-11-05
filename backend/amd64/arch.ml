@@ -70,13 +70,12 @@ type prefetch_temporal_locality_hint = Nonlocal | Low | Moderate | High
 type prefetch_info = {
   is_write: bool;
   locality: prefetch_temporal_locality_hint;
-  addr: addressing_mode;
 }
 
 type rounding_mode = Half_to_even | Down | Up | Towards_zero | Current
 
 type specific_operation =
-    Ilea of addressing_mode             (* "lea" gives scaled adds *)
+    Ilea                               (* "lea" gives scaled adds *)
   | Ioffset_loc                        (* Add a constant to a location *)
   | Ibswap of int                      (* endianness conversion *)
   | Isqrtf                             (* Float square root *)
@@ -170,7 +169,7 @@ let print_addressing printreg addr ppf arg =
 
 let print_specific_operation_name op =
   match op with
-  | Ilea addr -> "lea"
+  | Ilea -> "lea"
   | Ioffset_loc -> "offset_loc"
   | Isqrtf -> "sqrtf"
   | Ifloat_iround -> "float_iround"
@@ -187,7 +186,7 @@ let print_specific_operation_name op =
 
 let print_specific_operation printreg printoperand op ppf arg =
   match op with
-  | Ilea addr -> print_addressing printreg addr ppf arg
+  | Ilea -> printoperand arg.(0)
   | Ioffset_loc ->
       fprintf ppf "[%a] +:= %a" printoperand arg.(0) printoperand arg.(1)
   | Isqrtf ->
@@ -288,7 +287,7 @@ let equal_rounding_mode left right =
 
 let equal_specific_operation left right =
   match left, right with
-  | Ilea x, Ilea y -> equal_addressing_mode x y
+  | Ilea, Ilea -> true
   | Ioffset_loc, Ioffset_loc ->
     true
   | Ibswap left, Ibswap right ->
@@ -313,7 +312,7 @@ let equal_specific_operation left right =
     Iprefetch { is_write = right_is_write; locality = right_locality; } ->
     Bool.equal left_is_write right_is_write
     && equal_prefetch_temporal_locality_hint left_locality right_locality
-  | (Ilea _ | Ioffset_loc | Ibswap _
+  | (Ilea | Ioffset_loc | Ibswap _
     | Isqrtf | Isextend32 | Izextend32 | Irdtsc | Irdpmc
     | Ifloat_iround | Ifloat_round _ | Ifloat_min | Ifloat_max
     | Icrc32q | Iprefetch _), _ ->

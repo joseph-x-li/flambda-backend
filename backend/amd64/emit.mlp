@@ -296,6 +296,10 @@ let data_type : Cmm.memory_chunk -> X86_ast.data_type = function
   | Single -> REAL4
   | Double -> REAL8
 
+let data_type_opt : Cmm.memory_chunk option -> X86_ast.data_type = function
+  | None -> NONE
+  | Some typ -> data_type typ
+
 let arg ?(emit_reg=reg) i n =
   match Array.length i.operands with
   | 0 -> emit_reg i.arg.(n)
@@ -312,7 +316,7 @@ let arg ?(emit_reg=reg) i n =
            Misc.fatal_error ("Emit.arg mem with stack " ^ string_of_int n))
          r;
         let j = if Array.length r = 0 then 0 else r.(0) in
-        (addressing addr (data_type c) i j)
+        (addressing addr (data_type_opt c) i j)
 
 let operand i ~index =
   match Array.length i.operands with
@@ -909,8 +913,8 @@ let emit_instr fallthrough i =
       I.cvttsd2si (arg i 0) (res i 0)
   | Lop(Iopaque) ->
       assert (same_loc_arg_res0 i ~index:0)
-  | Lop(Ispecific(Ilea addr)) ->
-      I.lea (addressing addr NONE i 0) (res i 0)
+  | Lop(Ispecific(Ilea)) ->
+      I.lea (arg i 0) (res i 0)
   | Lop(Ispecific(Ioffset_loc)) ->
       I.add (arg i 1) (arg i 0)
   | Lop(Ispecific(Ibswap 16)) ->

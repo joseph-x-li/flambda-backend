@@ -154,7 +154,7 @@ let pseudoregs_for_operation op arg res operands =
     ([|res.(0); arg.(1)|], res)
   (* Other instructions are regular *)
   | Iintop (Ipopcnt|Iclz _|Ictz _|Icomp _|Icheckbound)
-  | Ispecific (Isqrtf|Isextend32|Izextend32|Ilea _
+  | Ispecific (Isqrtf|Isextend32|Izextend32|Ilea
               |Ifloat_iround|Ifloat_round _
               |Ioffset_loc|Irdtsc|Iprefetch _)
   | Imove|Ispill|Ireload|Ifloatofint|Iintoffloat|Iconst_int _|Iconst_float _
@@ -324,7 +324,8 @@ method! select_operation op args dbg =
         (Iindexed _, _, _)
       | (Iindexed2 0, _, _) -> super#select_operation op args dbg
       | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr,
-         arg, _) -> (Ispecific(Ilea addr), [arg], in_reg)
+         arg, len) -> (Ispecific Ilea, [arg],
+                       Operands.(selected (mem None addr ~len ~index:0)))
       end
   (* Recognize float arithmetic with memory. *)
   | Cextcall { func = "sqrt"; alloc = false; } ->
