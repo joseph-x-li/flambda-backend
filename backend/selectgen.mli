@@ -137,7 +137,7 @@ class virtual selector_generic : object
     (* Can be overridden to deal with special test instructions *)
   method select_store :
     bool -> Arch.addressing_mode -> Cmm.expression ->
-    Mach.operation * Cmm.expression * Operands.t
+    Mach.operation * Cmm.expression * Operands.operand_builder array
     (* Can be overridden to deal with special store constant instructions *)
   method memory_operands_supported : Mach.operation -> Cmm.memory_chunk -> bool
     (* Can be overridden to enable memory operands selection *)

@@ -820,6 +820,7 @@ method swap_operands op =
     | Istackoffset _ | Iload (_, _) | Istore (_, _, _) | Ialloc _
     | Ispecific _| Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ -> None
 
+(* CR gyorsh: unary/binary and separate selection *)
 method select_operands op args =
   let swap = self#swap_operands op in
   let commutative = Option.is_some swap in
