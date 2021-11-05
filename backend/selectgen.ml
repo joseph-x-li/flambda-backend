@@ -138,6 +138,8 @@ let env_empty = {
 
 let ppf_dump = ref Format.std_formatter
 
+let operands_of_regs rv = Array.map (fun r -> Mach.Ireg r) rv
+
 module Operands : sig
   type t
   type operand_builder
@@ -226,7 +228,7 @@ end = struct
 
   let emit : t -> Reg.t array -> Mach.operand array = fun t arg ->
     match t with
-    | In_registers -> Array.map (fun r -> Mach.Ireg r) arg
+    | In_registers -> operands_of_regs arg
     | Selected s ->
       check_operands arg s;
       Array.map (emit_operand arg) s
@@ -963,11 +965,11 @@ method regs_for tys = Reg.createv tys
 
 val mutable instr_seq = dummy_instr
 
-method insert_debug _env desc dbg res mach_operands =
-  instr_seq <- instr_cons_debug desc res mach_operands dbg instr_seq
+method insert_debug _env desc dbg arg res =
+  instr_seq <- instr_cons_debug desc arg res dbg instr_seq
 
-method insert _env desc res mach_operands =
-  instr_seq <- instr_cons desc res mach_operands instr_seq
+method insert _env desc arg res =
+  instr_seq <- instr_cons desc arg res instr_seq
 
 method extract =
   let rec extract res i =
@@ -1005,12 +1007,12 @@ method insert_move_results env loc res stacksize =
    to insert moves before and after the operation, i.e. for two-address
    instructions, or instructions using dedicated registers. *)
 
-method insert_op_debug env op dbg rd mach_operands =
-  self#insert_debug env (Iop op) dbg rd mach_operands;
+method insert_op_debug env op dbg rs rd =
+  self#insert_debug env (Iop op) dbg rd rs;
   rd
 
-method insert_op env op rd mach_operands =
-  self#insert_op_debug env op Debuginfo.none rd mach_operands
+method insert_op env op rs rd =
+  self#insert_op_debug env op Debuginfo.none rs rd
 
 (* Add the instructions for the given expression
    at the end of the self sequence *)
@@ -1078,7 +1080,7 @@ method emit_expr (env:environment) exp =
         None -> None
       | Some r1 ->
           let rd = [|Proc.loc_exn_bucket|] in
-          self#insert env (Iop Imove) (Array.map (fun r -> Mach.Ireg r) r1) rd;
+          self#insert env (Iop Imove) (operands_of_regs r1) rd;
           self#insert_debug env  (Iraise k) dbg
             [| Ireg Proc.loc_exn_bucket |] [||];
           set_traps_for_raise env;
@@ -1090,7 +1092,7 @@ method emit_expr (env:environment) exp =
       | Some (simple_args, env) ->
          let rs = self#emit_tuple env simple_args in
          Some (self#insert_op_debug env Iopaque dbg
-                 (Array.map (fun r -> Mach.Ireg r) rs)
+                 (operands_of_regs rs)
                  rs)
       end
   | Cop(op, args, dbg) ->
@@ -1134,7 +1136,8 @@ method emit_expr (env:environment) exp =
               let loc_res =
                 self#insert_op_debug env new_op dbg
                   mach_operands (Proc.loc_external_results (Reg.typv rd)) in
-              self#insert_move_results env loc_res rd stack_ofs;
+              self#insert_move_results env (operands loc_res)
+                rd stack_ofs;
               set_traps_for_raise env;
               if returns then Some rd else None
           | Ialloc { bytes = _; } ->

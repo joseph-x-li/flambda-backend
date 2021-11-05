@@ -148,13 +148,13 @@ class virtual selector_generic : object
        Can be overridden if float values are stored as pairs of
        integer registers. *)
   method insert_op :
-    environment -> Mach.operation -> Reg.t array -> Reg.t array
-      -> Operands.t -> Reg.t array
+    environment -> Mach.operation -> Mach.operand array -> Reg.t array
+      -> Reg.t array
     (* Can be overridden to deal with 2-address instructions
        or instructions with hardwired input/output registers *)
   method insert_op_debug :
-    environment -> Mach.operation -> Debuginfo.t -> Reg.t array
-      -> Reg.t array -> Operands.t -> Reg.t array
+    environment -> Mach.operation -> Debuginfo.t -> Mach.operand array
+      -> Reg.t array -> Reg.t array
     (* Can be overridden to deal with 2-address instructions
        or instructions with hardwired input/output registers *)
   method insert_move_extcall_arg :
