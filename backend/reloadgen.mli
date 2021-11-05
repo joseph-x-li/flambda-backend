@@ -18,7 +18,7 @@ class reload_generic : object
     Mach.operation -> Reg.t array -> Mach.operand array ->
     Mach.operand array * Reg.t array
   method reload_test : Mach.test -> Mach.operand array ->
-    Reg.t array
+    Mach.operand array
     (* Can be overridden to reflect instructions that can operate
        directly on stack locations *)
   method makereg : Reg.t -> Reg.t
@@ -29,10 +29,13 @@ class reload_generic : object
 
   (* The following methods should not be overridden.  They are provided
      as utilities to be used in classes that inherit from reloadgen. *)
-  method makeregs_for_memory : Mach.operand array -> Mach.operand array
+  method makeregs_for_memory_operands : Mach.operand array -> Mach.operand array
      (*  Force all "registers" used by memory operands to be in hardware
          registers, not on the stack. *)
-  method makeregs_operands : Mach.operand array -> Mach.operand array
-     (*  Force all "registers" referred to by the operands
-         to be in hardware registers, not on the stack. *)
+  (* method makeregs_operands : Mach.operand array -> Mach.operand array
+   *    (*  Force all "registers" referred to by the operands
+   *        to be in hardware registers, not on the stack. *) *)
+  method makereg_operand : Mach.operand -> Mach.operand
+     (*  Force "register" referred to by the operand, if any,
+         to be in a hardware register, not on the stack. *)
 end

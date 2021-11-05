@@ -369,7 +369,8 @@ let rec reload env i before =
          except the exception bucket *)
       let before_handler =
         Reg.Set.remove Proc.loc_exn_bucket
-                       (Reg.add_set_array handler.live handler.arg) in
+          (Reg.Set.union handler.live
+             (Mach.arg_regset handler.operands)) in
       let (new_handler, after_handler, env) =
         reload env handler before_handler
       in
@@ -380,7 +381,8 @@ let rec reload env i before =
        finally,
        env)
   | Iraise _ ->
-      let env, i = add_reloads env (Reg.inter_set_array before) i in
+      let env, i = add_reloads env (Reg.Set.inter before
+                                      (Mach.arg_regset i.operands)) i in
       (i, Reg.Set.empty, env)
 
 (* Second pass: add spill instructions based on what we've decided to reload.
@@ -481,7 +483,8 @@ let find_in_spill_cache nfail at_join env =
 
 let add_spills env regset i =
   Reg.Set.fold
-    (fun r i -> instr_cons (Iop Ispill) [|r|] [|spill_reg_no_add env r|] [||] i)
+    (fun r i -> instr_cons (Iop Ispill) [|Mach.Ireg r|]
+                  [|spill_reg_no_add env r|] i)
     regset i
 
 let rec spill :

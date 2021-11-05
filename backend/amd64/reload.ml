@@ -106,8 +106,8 @@ method private one_mem_or_stack operands =
     | Iimmf _  (* float immediate is implemented as a memory load *)
     | Imem _ ->
       (* CR gyorsh: this is different, previously we would always
-         force operand.(1), but not that it can be mem, we have to force
-         operand.(0) which is already forced to be the same as res.(0). *)
+         force operands.(1), but not that it can be mem, we have to force
+         operands.(0) which is already forced to be the same as res.(0). *)
       [| Ireg (self#makereg r); operands.(1) |]
   else
     operands
@@ -124,9 +124,9 @@ method private same_reg_res0_arg0 res operands =
     (operands, res)
 
 method! reload_operation op res operands =
-  let arg = self#force_reg_for_mem_operands arg operands in
+  let arg = self#makeregs_for_memory_operands operands in
   match op with
-  | Iintop(Iadd) when (not (Reg.same_loc (Mach.arg_reg operand.(0)) res.(0)))
+  | Iintop(Iadd) when (not (Reg.same_loc (Mach.arg_reg operands.(0)) res.(0)))
                       && is_immediate operands ~index:1 ->
       (* This add will be turned into a lea; args and results must be
          in registers *)
@@ -157,7 +157,7 @@ method! reload_operation op res operands =
   | Iintop(Imul) | Ifloatop (Iaddf | Isubf | Imulf | Idivf) ->
       (* First argument (= result) must be in register, second arg
          can reside in the stack *)
-      self#same_reg_res0_arg0 arg res operands
+      self#same_reg_res0_arg0 res operands
   | Ispecific (Irdtsc | Irdpmc) ->
       (* Irdtsc: result must be in register.
          Irdpmc: result must be in register, arg.(0) already forced in reg. *)
@@ -190,14 +190,13 @@ method! reload_operation op res operands =
       (* Result must be in register, but argument can be on stack *)
       (arg, (if stackp res.(0) then [| self#makereg res.(0) |] else res))
   | Ispecific  (Isqrtf | Isextend32 | Izextend32 | Ilea _
-               | Istore_int (_, _, _)
-               | Ioffset_loc (_, _)
+               | Ioffset_loc
                | Iprefetch _
                | Ibswap _)
   | Imove|Ispill|Ireload|Ifloatop(Inegf|Iabsf)
   | Iconst_float _|Icall_ind|Icall_imm _
   | Itailcall_ind|Itailcall_imm _|Iextcall _|Istackoffset _|Iload (_, _)
-  | Istore (_, _, _)|Ialloc _|Iname_for_debugger _|Iprobe _|Iprobe_is_enabled _
+  | Istore  _|Ialloc _|Iname_for_debugger _|Iprobe _|Iprobe_is_enabled _
   | Iopaque
     -> (* Other operations: all args and results in registers *)
       super#reload_operation op arg res operands

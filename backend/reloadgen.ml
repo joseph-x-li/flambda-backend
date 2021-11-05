@@ -92,7 +92,7 @@ method private makereg1 ov =
 
 (* If operand.(i) is a memory access, force any Reg.t it refers to
    to be in hardware reg, not on the stack. *)
-method makeregs_for_mem_operands operands =
+method makeregs_for_memory_operands operands =
   Array.map (fun operand ->
     match operand with
     | Ireg _ | Iimm _ | Iimmf _ -> operand
@@ -100,7 +100,7 @@ method makeregs_for_mem_operands operands =
     operands;
 
 method reload_operation op res operands =
-  let operands = self#makeregs_for_mem_operands operands in
+  let operands = self#makeregs_for_memory_operands operands in
   (* By default, assume that arguments and results must reside
      in hardware registers. For moves, allow one arg or one
      res to be stack-allocated, but do something for

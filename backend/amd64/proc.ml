@@ -399,7 +399,7 @@ let max_register_pressure i =
     | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
             | Ipopcnt|Iclz _| Ictz _|Icheckbound)
     | Imove | Ispill | Ireload
-    | Ifloatop (Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf)
+    | Ifloatop (Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf | Icompf _)
     | Ifloatofint | Iintoffloat | Iconst_int _ | Iconst_float _ | Iconst_symbol _
     | Icall_ind | Icall_imm _ | Itailcall_ind | Itailcall_imm _
     | Istackoffset _ | Iload (_, _)
@@ -412,6 +412,7 @@ let max_register_pressure i =
     | Iname_for_debugger _ | Iprobe _ | Iprobe_is_enabled _ | Iopaque
       -> consumes ~int:0 ~float:0)
   | Iend | Ireturn _ | Iifthenelse (_, _, _) | Icatch (_, _, _, _)
+  | Iswitch _ | Itrywith (_, _, _)
   | Iexit _ | Iraise _ ->
     Misc.fatal_error "Proc.max_register_pressure: unexpected op"
 
@@ -425,8 +426,8 @@ let op_is_pure = function
   | Ispecific(Iprefetch _) -> false
   | Ispecific(Ilea _ | Isextend32 | Izextend32 | Ifloat_iround | Ifloat_round _
              | Ifloat_min | Ifloat_max) -> true
-  | Ispecific(Irdtsc | Irdpmc | Icrc32q | Istore_int (_, _, _)
-             | Ioffset_loc (_, _)
+  | Ispecific(Irdtsc | Irdpmc | Icrc32q
+             | Ioffset_loc
              | Ibswap _ | Isqrtf)-> false
   | Iprobe _ | Iprobe_is_enabled _-> false
   | Iintop(Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor

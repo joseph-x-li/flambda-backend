@@ -68,7 +68,7 @@ let repres_reg_operand o =
   match o with
   | Ireg r -> Ireg (repres_reg r)
   | Iimm _ | Iimmf _ -> o
-  | Imem (c,a,rv) -> Imem (c,a,repres_regs rv)
+  | Imem (c,a,rv) -> repres_regs rv; Imem (c,a,rv)
 
 let repres_regs_operands v =
   let n = Array.length v in
@@ -228,7 +228,7 @@ let rec rename i sub =
 (* Second pass: replace registers by their final representatives *)
 
 let set_repres i =
-  instr_iter (fun i -> repres_regs i.arg; repres_regs i.res) i
+  instr_iter (fun i -> repres_regs_operands i.operands; repres_regs i.res) i
 
 (* Entry point *)
 
