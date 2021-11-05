@@ -168,7 +168,7 @@ method! reload_operation op res operands =
   | Ispecific Icrc32q ->
     (* First argument and result must be in the same register.
        Second argument can be either in a register or on stack. *)
-      self#same_reg_res0_arg0 arg res operands
+      self#same_reg_res0_arg0 res operands
   | Ifloatop(Icompf _) ->
     (* First argument is forced to be the same as the second result,
        and it must be in register. *)

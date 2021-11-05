@@ -409,10 +409,11 @@ method! select_operation op args dbg =
         | Moderate when is_write && not !prefetchwt1_support -> High
         | l -> l
       in
-      let addr, eloc, _ =
+      let addr, eloc, len =
         self#select_addressing Word_int (one_arg "prefetch" args)
       in
-      Ispecific (Iprefetch { is_write; addr; locality; }), [eloc], in_reg
+      Ispecific (Iprefetch { is_write; locality; }), [eloc],
+      [| Imem Word_int addr ~len ~index:0 |]
   | Ccmpf comp ->
       let _,need_swap = Arch.float_compare_and_need_swap comp in
       let args =

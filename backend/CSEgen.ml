@@ -281,7 +281,7 @@ method private cse n i k =
   | Iop (Imove | Ispill | Ireload) ->
       (* For moves, we associate the same value number to the result reg
          as to the argument reg. *)
-      let n1 = set_move n i.operands.(0) i.res.(0) in
+      let n1 = set_move n (Mach.arg_reg i.operands.(0)) i.res.(0) in
       self#cse n1 i.next (fun next -> k (Mach.copy i ~next))
   | Iop (Icall_ind | Icall_imm _ | Iextcall _ | Iprobe _) ->
       (* For function calls and probes, we should at least forget:

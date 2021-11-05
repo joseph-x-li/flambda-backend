@@ -96,7 +96,6 @@ type specific_operation =
   | Iprefetch of                       (* memory prefetching hint *)
       { is_write: bool;
         locality: prefetch_temporal_locality_hint;
-        addr: addressing_mode;
       }
 
 and float_operation =
@@ -186,8 +185,7 @@ let print_specific_operation_name op =
   | Icrc32q -> "crc32"
   | Iprefetch _ -> "prefetch"
 
-let print_specific_operation printreg
-      (printoperand: Format.formatter -> 'a -> unit) op ppf (arg : 'a array) =
+let print_specific_operation printreg printoperand op ppf arg =
   match op with
   | Ilea addr -> print_addressing printreg addr ppf arg
   | Ioffset_loc ->
@@ -311,11 +309,10 @@ let equal_specific_operation left right =
   | Ifloat_round x, Ifloat_round y -> equal_rounding_mode x y
   | Ifloat_min, Ifloat_min -> true
   | Ifloat_max, Ifloat_max -> true
-  | Iprefetch { is_write = left_is_write; locality = left_locality; addr = left_addr; },
-    Iprefetch { is_write = right_is_write; locality = right_locality; addr = right_addr; } ->
+  | Iprefetch { is_write = left_is_write; locality = left_locality; },
+    Iprefetch { is_write = right_is_write; locality = right_locality; } ->
     Bool.equal left_is_write right_is_write
     && equal_prefetch_temporal_locality_hint left_locality right_locality
-    && equal_addressing_mode left_addr right_addr
   | (Ilea _ | Ioffset_loc | Ibswap _
     | Isqrtf | Isextend32 | Izextend32 | Irdtsc | Irdpmc
     | Ifloat_iround | Ifloat_round _ | Ifloat_min | Ifloat_max

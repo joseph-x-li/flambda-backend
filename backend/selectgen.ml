@@ -1080,7 +1080,9 @@ method emit_expr (env:environment) exp =
         None -> None
       | Some (simple_args, env) ->
          let rs = self#emit_tuple env simple_args in
-         Some (self#insert_op_debug env Iopaque dbg [|Mach.Ireg rs|] [|rs|])
+         Some (self#insert_op_debug env Iopaque dbg
+                 (Array.map (fun r -> Mach.Ireg r) rs)
+                 rs)
       end
   | Cop(op, args, dbg) ->
       begin match self#emit_parts_list env args with
@@ -1091,7 +1093,7 @@ method emit_expr (env:environment) exp =
             self#select_operation op simple_args dbg in
           match new_op with
             Icall_ind ->
-              let r1 = self#emit_tuple env new_args in
+              let ( r1 : Reg.t array ) = self#emit_tuple env new_args in
               let rarg = Array.sub r1 1 (Array.length r1 - 1) in
               let rd = self#regs_for ty in
               let (loc_arg, stack_ofs) = Proc.loc_arguments (Reg.typv rarg) in
