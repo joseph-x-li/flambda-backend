@@ -45,8 +45,8 @@ let insert_moves_operands src dst next =
       match src.(i), dst.(i) with
       | o, o' when Mach.equal_operand o o' -> insmoves (i+1)
       | Ireg r_src, Ireg r_dst -> insert_move r_src r_dst (insmoves (i+1))
-      | Imem (c,a,rv), Imem (c',a',rv')
-        when Cmm.equal_memory_chunk c c' &&
+      | Imem { chunk=c; addr=a; reg=rv }, Imem { chunk=c'; addr=a'; reg=rv' }
+        when Option.equal Cmm.equal_memory_chunk c c' &&
              Arch.equal_addressing_mode a a' ->
         insert_moves rv rv' (insmoves (i+1))
       (* | (Imem _ | Iimm _ | Iimmf _), Ireg r when not (Reg.is_stack r) ->
@@ -80,7 +80,7 @@ method makereg_operand o =
   match o with
   | Iimm _ | Iimmf _ -> o
   | Ireg r -> Ireg (self#makereg r)
-  | Imem (c, a, rv) -> Imem (c, a, self#makeregs rv)
+  | Imem m -> Imem { m with reg = self#makeregs m.reg }
 
 method private makeregs_operands ov =
   Array.init (Array.length ov) (fun i -> self#makereg_operand ov.(i))
@@ -96,7 +96,7 @@ method makeregs_for_memory_operands operands =
   Array.map (fun operand ->
     match operand with
     | Ireg _ | Iimm _ | Iimmf _ -> operand
-    | Imem (c,a,rv) -> Imem (c,a,self#makeregs rv))
+    | Imem m -> Imem { m with reg = self#makeregs m.reg })
     operands;
 
 method reload_operation op res operands =

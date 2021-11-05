@@ -88,7 +88,10 @@ type operand =
   | Iimm of Targetint.t
   | Iimmf of int64
   | Ireg of Reg.t
-  | Imem of Cmm.memory_chunk * Arch.addressing_mode * Reg.t array
+  | Imem of { chunk : Cmm.memory_chunk option;
+              addr : Arch.addressing_mode;
+              reg : Reg.t array;
+            }
 
 type instruction = private
   { desc: instruction_desc;

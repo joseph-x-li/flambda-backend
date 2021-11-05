@@ -142,7 +142,7 @@ module Operands : sig
   type t
   type operand_builder
 
-  val mem : Cmm.memory_chunk -> Arch.addressing_mode ->
+  val mem : Cmm.memory_chunk option -> Arch.addressing_mode ->
     index:int -> len:int -> operand_builder
   val reg : index:int -> operand_builder
   val imm : Targetint.t -> operand_builder
@@ -163,7 +163,10 @@ end = struct
     | Iimm of Targetint.t
     | Iimmf of int64
     | Ireg of int                               (** Index into instruction.arg *)
-    | Imem of Cmm.memory_chunk * Arch.addressing_mode * int array
+    | Imem of { chunk : Cmm.memory_chunk option;
+                addr : Arch.addressing_mode;
+                reg : int array;
+              }
     (** indexes into instruction.arg for the registers used in addressing_mode *)
 
   type t = In_registers | Selected of operand_builder array
@@ -190,14 +193,14 @@ end = struct
                                  %d not in args (args length = %d"
                 j n ();
             j :: acc
-          | Imem (chunk,addr,r) ->
+          | Imem m ->
             Array.iter (fun j ->
               if (j >= n) then
                 Misc.fatal_errorf "Selectgen.check_operands: \
                                    %d not in args (args length = %d"
                   j n ())
-              r;
-            (Array.to_list r) @ acc
+              m.reg;
+            (Array.to_list m.reg) @ acc
         ) [] operands
         |> List.sort_uniq Int.compare
       in
@@ -217,9 +220,9 @@ end = struct
     | Iimm n -> Iimm n
     | Iimmf f -> Iimmf f
     | Ireg i -> Ireg arg.(i)
-    | Imem (chunk,addr,r) ->
-      let r' = Array.map (fun j -> arg.(j)) r in
-      Imem (chunk, addr, r')
+    | Imem { chunk; addr; reg; } ->
+      let reg = Array.map (fun j -> arg.(j)) reg in
+      Imem { chunk; addr; reg; }
 
   let emit : t -> Reg.t array -> Mach.operand array = fun t arg ->
     match t with
@@ -228,9 +231,9 @@ end = struct
       check_operands arg s;
       Array.map (emit_operand arg) s
 
-  let mem chunk mode ~index ~len =
-    let r = Array.init len (fun i -> index + i) in
-    Imem (chunk, mode, r)
+  let mem chunk addr ~index ~len =
+    let reg = Array.init len (fun i -> index + i) in
+    Imem { chunk; addr; reg }
 
   let reg ~index = Ireg index
 
@@ -259,11 +262,13 @@ end = struct
     | Ireg i -> print_reg ppf i
     | Iimm i -> fprintf ppf "imm %a" Targetint.print i
     | Iimmf f -> fprintf ppf "immf %f" (Int64.float_of_bits f)
-    | Imem (c, a, r) ->
+    | Imem m ->
       fprintf ppf "mem %s[%a]"
-        (Printcmm.chunk c)
-        (Arch.print_addressing print_reg a)
-        r
+        (match m.chunk with
+         | None -> ""
+         | Some chunk -> (Printcmm.chunk chunk))
+        (Arch.print_addressing print_reg m.addr)
+        m.reg
 
   let print_operands ppf v =
     match Array.length v with
@@ -737,7 +742,7 @@ method select_operation op args _dbg =
         | Lambda.Assignment -> true
       in
       let (op, newarg2, operands) =
-          self#select_store is_assign chunk addr len arg2 in
+          self#select_store is_assign (Some chunk) addr len arg2 in
       (op, [newarg2; eloc], operands)
   | (Calloc, _) -> (Ialloc {bytes = 0; dbginfo = []}), args,
                    (Operands.in_registers ())
@@ -846,20 +851,22 @@ method select_operands op args =
   | [Cop(Cload (c, _), [loc], _dbg)]
     when self#memory_operands_supported op c ->
     let (addr, arg, len) = self#select_addressing c loc in
-    let operands = Operands.(selected [| mem c addr ~index:0 ~len |]) in
+    let operands = Operands.(selected [| mem (Some c) addr ~index:0 ~len |]) in
     Operands.report operands op;
     (op, [arg], operands)
   | [arg1; Cop(Cload (c, _), [loc2], _)]
     when self#memory_operands_supported op c ->
     let (addr, arg2, len) = self#select_addressing c loc2 in
-    let operands = Operands.(selected [| reg 0; mem c addr ~index:1 ~len |]) in
+    let operands =
+      Operands.(selected [| reg 0; mem (Some c) addr ~index:1 ~len |]) in
     Operands.report operands op;
     (op, [arg1; arg2], operands)
   | [Cop(Cload (c, _), [loc1], _); arg2]
     when commutative
       && self#memory_operands_supported (Option.get swap) c ->
     let (addr, arg1, len) = self#select_addressing c loc1 in
-    let operands = Operands.(selected [| reg 0; mem c addr ~index:1 ~len |]) in
+    let operands =
+      Operands.(selected [| reg 0; mem (Some c) addr ~index:1 ~len |]) in
     Operands.report operands ~swap:true op;
     ((Option.get swap), [arg2; arg1], operands)
   | _ -> op, args, (Operands.in_registers ())
@@ -906,13 +913,14 @@ method select_operands_condition op args =
   | [Cop(Cload (c, _), [loc], _dbg)]
     when self#memory_operands_supported_condition op c ->
     let (addr, arg, len) = self#select_addressing c loc in
-    let operands = Operands.(selected [| mem c addr ~index:0 ~len |]) in
+    let operands = Operands.(selected [| mem (Some c) addr ~index:0 ~len |]) in
     Operands.report_test operands op;
     (op, arg, operands)
   | [arg1; Cop(Cload (c, _), [loc2], _)]
     when self#memory_operands_supported_condition op c ->
     let (addr, arg2, len) = self#select_addressing c loc2 in
-    let operands = Operands.(selected [| reg 0; mem c addr ~index:1 ~len |]) in
+    let operands =
+      Operands.(selected [| reg 0; mem (Some c) addr ~index:1 ~len |]) in
     Operands.report_test operands op;
     op,
     Ctuple [arg1; arg2],
@@ -921,7 +929,8 @@ method select_operands_condition op args =
     when commutative
       && self#memory_operands_supported_condition (Option.get swap) c ->
     let (addr, arg1, len) = self#select_addressing c loc1 in
-    let operands = Operands.(selected [| reg 0; mem c addr ~index:1 ~len |]) in
+    let operands =
+      Operands.(selected [| reg 0; mem (Some c) addr ~index:1 ~len |]) in
     Operands.report_test operands ~swap:true op;
     (Option.get swap),
     Ctuple [arg2; arg1],

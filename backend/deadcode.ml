@@ -41,7 +41,7 @@ let live_and_args i =
     match operand with
     | Iimm _ | Iimmf _ -> s
     | Ireg r -> Reg.Set.add r s
-    | Imem (_,_,r) -> Reg.add_set_array s r)
+    | Imem { reg } -> Reg.add_set_array s reg)
     i.live i.operands
 
 let rec deadcode i =

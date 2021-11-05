@@ -41,7 +41,7 @@ let subst_reg_in_operand o (sub : subst) =
   match o with
   | Ireg r -> Ireg (subst_reg r sub)
   | Iimm _ | Iimmf _ -> o
-  | Imem (c,a,rv) -> Imem (c,a,subst_regs rv (Some sub))
+  | Imem m -> Imem { m with reg = subst_regs m.reg (Some sub) }
 
 let subst_regs_in_operands v sub =
   match sub with
@@ -68,7 +68,7 @@ let repres_reg_operand o =
   match o with
   | Ireg r -> Ireg (repres_reg r)
   | Iimm _ | Iimmf _ -> o
-  | Imem (c,a,rv) -> repres_regs rv; Imem (c,a,rv)
+  | Imem m -> repres_regs m.reg; o
 
 let repres_regs_operands v =
   let n = Array.length v in

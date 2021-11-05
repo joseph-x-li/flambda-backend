@@ -29,7 +29,7 @@ method! class_of_operation op operands =
   match op with
   | Ispecific spec ->
     begin match spec with
-    | Ilea _ | Isextend32 | Izextend32 -> Op_pure
+    | Ilea | Isextend32 | Izextend32 -> Op_pure
     | Ioffset_loc -> Op_store true
     | Ibswap _ | Isqrtf -> super#class_of_operation op operands
     | Irdtsc | Irdpmc -> Op_other

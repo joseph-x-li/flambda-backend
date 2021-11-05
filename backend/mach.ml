@@ -79,7 +79,10 @@ type operand =
   | Iimm of Targetint.t
   | Iimmf of int64
   | Ireg of Reg.t
-  | Imem of Cmm.memory_chunk * Arch.addressing_mode * Reg.t array
+  | Imem of { chunk : Cmm.memory_chunk option;
+              addr : Arch.addressing_mode;
+              reg : Reg.t array;
+            }
 
 type instruction =
   { desc: instruction_desc;
@@ -144,7 +147,7 @@ let arg_regset operands =
   Array.fold_left (fun s -> function
     | Iimm _ | Iimmf _ -> s
     | Ireg r -> Reg.Set.add r s
-    | Imem (_,_,r) -> Reg.add_set_array s r)
+    | Imem { reg } -> Reg.add_set_array s reg)
     Reg.Set.empty operands
 
 let same_loc operand reg =
@@ -386,9 +389,9 @@ let equal_operand left right =
   | Iimm left, Iimm right -> Targetint.equal left right
   | Iimmf left, Iimmf right -> Int64.equal left right
   | Ireg left, Ireg right -> Reg.same_loc left right
-  | Imem (chunk_left, addr_left, left), Imem (chunk_right, addr_right, right) ->
-    Cmm.equal_memory_chunk chunk_left chunk_right &&
-    Arch.equal_addressing_mode addr_left addr_right &&
-    Array.length left = Array.length right &&
-    Array.for_all2 Reg.same_loc left right
+  | Imem left, Imem right ->
+    Option.equal Cmm.equal_memory_chunk left.chunk right.chunk &&
+    Arch.equal_addressing_mode left.addr right.addr &&
+    Array.length left.reg = Array.length right.reg &&
+    Array.for_all2 Reg.same_loc left.reg right.reg
   | (Iimm _ | Iimmf _ | Ireg _ | Imem _),_ -> false

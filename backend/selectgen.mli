@@ -38,7 +38,7 @@ module Operands : sig
   type t                  (** a constructor for operand array  *)
   type operand_builder (** a constructor for a single operand  *)
 
-  val mem : Cmm.memory_chunk -> Arch.addressing_mode ->
+  val mem : Cmm.memory_chunk option -> Arch.addressing_mode ->
     index:int -> len:int -> operand_builder
   val reg : index:int -> operand_builder
   val imm : Targetint.t -> operand_builder

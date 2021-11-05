@@ -53,9 +53,13 @@ let operand ppf = function
   | Ireg r -> fprintf ppf "reg %a" reg r
   | Iimm i -> fprintf ppf "imm %a" Targetint.print i
   | Iimmf f -> fprintf ppf "immf %F" (Int64.float_of_bits f)
-  | Imem (c, a, r) ->
-    fprintf ppf "mem %s[%a]" (Printcmm.chunk c)
-      (Arch.print_addressing reg a) r
+  | Imem { chunk; addr; reg=rv } ->
+    let c =
+      match chunk with
+      | Some chunk -> (Printcmm.chunk chunk)
+      | None -> ""
+    in
+    fprintf ppf "mem %s[%a]" c (Arch.print_addressing reg addr) rv
 
 let operands ppf v =
   match Array.length v with
@@ -144,7 +148,7 @@ let test tst ppf arg =
   | Ieventest -> fprintf ppf "%a & 1 == 0" operand arg.(0)
   | Ioddtest -> fprintf ppf "%a & 1 == 1" operand arg.(0)
 
-let operation op ppf res arg =
+let operation op arg ppf res =
   if Array.length res > 0 then fprintf ppf "%a := " regs res;
   match op with
   | Imove -> operands ppf arg

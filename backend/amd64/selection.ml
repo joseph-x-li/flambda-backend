@@ -21,6 +21,8 @@ open Proc
 open Cmm
 open Mach
 
+module O = Selectgen.Operands
+
 (* Auxiliary for recognizing addressing modes *)
 
 type addressing_expr =
@@ -116,7 +118,7 @@ let pseudoregs_for_operation op arg res operands =
       ([| rax; arg.(1) |], [| rdx |])
   | Iintop(Ilsl|Ilsr|Iasr) ->
      (* arg.(0) and res.(0) must be the same *)
-     if Selectgen.Operands.is_immediate operands ~index:1 then
+     if O.is_immediate operands ~index:1 then
        same_reg_res0_arg0 arg res
      else
        (* For shifts with variable shift count, second arg must be in rcx *)
@@ -286,8 +288,7 @@ method select_addressing _chunk exp =
 method! select_store is_assign chunk addr len exp =
   let chunk_for_imm = chunk = Word_int || chunk = Word_val in
   let mk_mem n =
-    Selectgen.Operands.(selected [| imm n;
-                                    mem Word_int addr ~len ~index:0 |]) in
+    O.(selected [| imm n; mem (Some Word_int) addr ~len ~index:0 |]) in
   match exp with
     Cconst_int (n, _dbg) when chunk_for_imm && is_immediate n ->
     (Istore is_assign, Ctuple [], mk_mem (Targetint.of_int n))
@@ -316,7 +317,7 @@ method select_condition cond =
 
 method! select_operation op args dbg =
   (* CR gyorsh: some operations, like crc32 and roundsd can have memory operands *)
-  let in_reg = Selectgen.Operands.in_registers () in
+  let in_reg = O.in_registers () in
   match op with
   (* Recognize the LEA instruction *)
     Caddi | Caddv | Cadda | Csubi ->
@@ -325,7 +326,7 @@ method! select_operation op args dbg =
       | (Iindexed2 0, _, _) -> super#select_operation op args dbg
       | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr,
          arg, len) -> (Ispecific Ilea, [arg],
-                       Operands.(selected (mem None addr ~len ~index:0)))
+                       O.(selected [| mem None addr ~len ~index:0 |]))
       end
   (* Recognize float arithmetic with memory. *)
   | Cextcall { func = "sqrt"; alloc = false; } ->
@@ -368,8 +369,8 @@ method! select_operation op args dbg =
         when loc = loc' && is_immediate n ->
           let (addr, arg, len) = self#select_addressing chunk loc in
           (Ispecific Ioffset_loc, [arg],
-           Selectgen.Operands.(selected [| mem chunk addr ~len ~index:0;
-                                           imm (Targetint.of_int n) |]))
+           O.(selected [| mem (Some chunk) addr ~len ~index:0;
+                          imm (Targetint.of_int n) |]))
       | _ ->
           super#select_operation op args dbg
       end
@@ -414,7 +415,7 @@ method! select_operation op args dbg =
         self#select_addressing Word_int (one_arg "prefetch" args)
       in
       Ispecific (Iprefetch { is_write; locality; }), [eloc],
-      [| Imem Word_int addr ~len ~index:0 |]
+      O.(selected [| mem (Some Word_int) addr ~len ~index:0 |])
   | Ccmpf comp ->
       let _,need_swap = Arch.float_compare_and_need_swap comp in
       let args =

@@ -150,7 +150,7 @@ let build_graph fundecl =
       match operands.(i) with
       | Iimm _ | Iimmf _ -> ()
       | Ireg r -> r.spill_cost <- r.spill_cost + cost
-      | Imem (_,_,r) -> add_spill_cost cost r
+      | Imem { reg } -> add_spill_cost cost reg
     done in
 
   (* Compute preferences and spill costs *)

@@ -173,7 +173,8 @@ method! reload_operation op res arg =
     (* First argument is forced to be the same as the second result,
        and it must be in register. *)
       if stackp res.(1)
-      then (let r = self#makereg res.(1) in ([|r; arg.(1)|], [|res.(0); r|]))
+      then (let r = self#makereg res.(1) in
+            ([|Ireg r; arg.(1)|], [|res.(0); r|]))
       else (arg, res)
   | Ifloatofint | Iintoffloat ->
       (* Result must be in register, but argument can be on stack *)
@@ -202,11 +203,11 @@ method! reload_operation op res arg =
       super#reload_operation op res arg
 
 method! reload_test tst operands =
-  let operands = self#makeregs_for_mem_operands operands in
+  let operands = self#makeregs_for_memory_operands operands in
   match tst with
   | Iinttest _ ->
       (* One of the two arguments can reside in memory or on stack *)
-      self#one_mem_or_stack arg operands
+      self#one_mem_or_stack operands
   | Ifloattest (CFlt | CFnlt | CFle | CFnle | CFeq
                | CFneq | CFgt | CFngt | CFge | CFnge) ->
       (* Second argument can be on stack, first must be in register *)

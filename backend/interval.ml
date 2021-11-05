@@ -102,8 +102,8 @@ let update_interval_position_by_instr intervals instr pos =
     | Iimm _ | Iimmf _ -> ()
     | Ireg r ->
       update_interval_position intervals pos Argument r
-    | Imem (_,_,r) ->
-      update_interval_position_by_array intervals r pos Argument)
+    | Imem { reg } ->
+      update_interval_position_by_array intervals reg pos Argument)
     instr.operands;
   update_interval_position_by_array intervals instr.res pos Result;
   update_interval_position_by_set intervals instr.live pos Live

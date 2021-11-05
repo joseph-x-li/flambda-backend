@@ -186,7 +186,7 @@ let print_specific_operation_name op =
 
 let print_specific_operation printreg printoperand op ppf arg =
   match op with
-  | Ilea -> printoperand arg.(0)
+  | Ilea -> printoperand ppf arg.(0)
   | Ioffset_loc ->
       fprintf ppf "[%a] +:= %a" printoperand arg.(0) printoperand arg.(1)
   | Isqrtf ->

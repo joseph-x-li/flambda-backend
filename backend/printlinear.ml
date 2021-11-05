@@ -34,7 +34,7 @@ let instr ppf i =
           fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live
       | _ -> ()
       end;
-      operation op ppf i.res i.operands
+      operation op i.operands ppf i.res
   | Lreloadretaddr ->
       fprintf ppf "reload retaddr"
   | Lreturn ->

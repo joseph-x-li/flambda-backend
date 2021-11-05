@@ -310,10 +310,12 @@ let destroyed_at_oper op operands =
         -> [| rax; rdx |]
   | Iop(Istore _) ->
     (match operands.(1) with
-     | Imem (Single, _, _) ->  [| rxmm15 |]
-     | Imem ((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-            | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
-            | Double),_,_) ->
+     | Imem { chunk = Some Single } ->  [| rxmm15 |]
+     | Imem { chunk = None; }
+     | Imem { chunk = Some
+             (Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+             | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
+             | Double); } ->
        if fp then
          (* prevent any use of the frame pointer ! *)
          [| rbp |]
@@ -327,7 +329,7 @@ let destroyed_at_oper op operands =
   | Iswitch(_, _) -> [| rax; rdx |]
   | Itrywith _ -> [| r11 |]
   | Iop(Ispecific (Irdtsc | Irdpmc)) -> [| rax; rdx |]
-  | Iop(Ispecific(Isqrtf | Isextend32 | Izextend32 | Icrc32q | Ilea _
+  | Iop(Ispecific(Isqrtf | Isextend32 | Izextend32 | Icrc32q | Ilea
                  | Ioffset_loc
                  | Iprefetch _
                  | Ifloat_round _
@@ -390,10 +392,12 @@ let max_register_pressure i =
       consumes ~int:1 ~float:0
     | Istore _ ->
       (match i.operands.(1) with
-       | Imem (Single,_,_) -> consumes ~int:0 ~float:1
-       | Imem ((Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-               | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
-               | Double),_,_) -> consumes ~int:0 ~float:0
+       | Imem { chunk = Some Single; } -> consumes ~int:0 ~float:1
+       | Imem { chunk = None; }
+       | Imem { chunk = Some
+             (Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+             | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
+             | Double); } -> consumes ~int:0 ~float:0
        | Iimm _ | Iimmf _ | Ireg _ ->
          Misc.fatal_error "Proc.destroyed_at_oper Istore")
     | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
@@ -403,7 +407,7 @@ let max_register_pressure i =
     | Ifloatofint | Iintoffloat | Iconst_int _ | Iconst_float _ | Iconst_symbol _
     | Icall_ind | Icall_imm _ | Itailcall_ind | Itailcall_imm _
     | Istackoffset _ | Iload (_, _)
-    | Ispecific(Ilea _ | Isextend32 | Izextend32 | Iprefetch _
+    | Ispecific(Ilea | Isextend32 | Izextend32 | Iprefetch _
                | Irdtsc | Irdpmc | Icrc32q
                | Ifloat_round _
                | Ifloat_iround | Ifloat_min | Ifloat_max
@@ -424,7 +428,7 @@ let op_is_pure = function
   | Iextcall _ | Istackoffset _ | Istore _ | Ialloc _
   | Iintop(Icheckbound) | Iopaque -> false
   | Ispecific(Iprefetch _) -> false
-  | Ispecific(Ilea _ | Isextend32 | Izextend32 | Ifloat_iround | Ifloat_round _
+  | Ispecific(Ilea | Isextend32 | Izextend32 | Ifloat_iround | Ifloat_round _
              | Ifloat_min | Ifloat_max) -> true
   | Ispecific(Irdtsc | Irdpmc | Icrc32q
              | Ioffset_loc
