@@ -283,13 +283,14 @@ method select_addressing _chunk exp =
     | Ascaledadd(e1, e2, scale) ->
         (Iindexed2scaled(scale, d), Ctuple[e1; e2], 2)
 
-method! select_store is_assign addr exp =
+method! select_store is_assign chunk addr len exp =
+  let chunk_for_imm = chunk = Word_int || chunk = Word_val in
   (* CR gyorsh: can it now be done simply with select_operands? *)
   match exp with
-    Cconst_int (n, _dbg) when is_immediate n ->
+    Cconst_int (n, _dbg) when chunk_for_imm && is_immediate n ->
     (Istore is_assign, Ctuple [], [| Operands.imm (Targetint.of_int n) |],
      Word_int)
-  | (Cconst_natint (n, _dbg)) when is_immediate_natint n ->
+  | (Cconst_natint (n, _dbg)) when chunk_for_imm && is_immediate_natint n ->
     (Istore is_assign, Ctuple [], [| Operands.imm n |],
      Word_int)
   | Cconst_int _

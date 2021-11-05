@@ -680,8 +680,9 @@ method virtual select_addressing :
 
 (* Default instruction selection for stores (of words) *)
 
-method select_store is_assign addr arg =
-  (Istore is_assign, arg, Operands.in_registers (), Word_val)
+method select_store is_assign chunk addr len arg =
+  (Istore is_assign, arg,
+   Operands.(selected [| reg 0; mem chunk addr len ~index:1 |]))
 
 (* call marking methods, documented in selectgen.mli *)
 val contains_calls = ref false
@@ -738,18 +739,9 @@ method select_operation op args _dbg =
         | Lambda.Heap_initialization -> false
         | Lambda.Assignment -> true
       in
-      if chunk = Word_int || chunk = Word_val then begin
-        let (op, newarg2, operands_for_arg2, chunk) =
-          self#select_store is_assign addr arg2 in
-        let index = Array.length operands_for_arg2 in
-        (op, [newarg2; eloc],
-         Operands.append operands_for_arg2
-           [| Operands.mem chunk addr ~index ~len |])
-      end else begin
-        (Istore is_assign, [arg2; eloc],
-         Operands.(selected [| reg 0; mem chunk addr ~index:1 ~len |])
-        (* Inversion addr/datum in Istore *)
-      end
+      let (op, newarg2, operands) =
+          self#select_store is_assign chunk addr len arg2 in
+      (op, [newarg2; eloc], operands)
   | (Calloc, _) -> (Ialloc {bytes = 0; dbginfo = []}), args,
                    (Operands.in_registers ())
   | (Caddi, _) -> self#select_operands (Iintop Iadd) args
@@ -1488,23 +1480,20 @@ method emit_stores env data regs_for_addr =
   let len = Array.length regs_for_addr in
   let a =
     ref (Arch.offset_addressing Arch.identity_addressing (-Arch.size_int)) in
-  let emit_store op regs_for_e operands_for_e chunk new_size =
-    assert (Array.legnth operands_for_e > 0);
-    let mach_operands_for_e =
-      Operands.(emit (selected operands_for_e) regs_for_e) in
-    let mach_operands_for_addr = Mach.Imem (chunk, !a, regs_for_addr) in
-    self#insert env (Iop op) [||]
-      (Array.append mach_operands_for_e mach_operands_for_addr);
+  let emit_store op regs_for_e operands chunk new_size =
+    let mach_operands =
+      Operands.emit operand (Array.append regs_for_e regs_for_addr) in
+    self#insert env (Iop op) [||] mach_operands;
     a := Arch.offset_addressing !a new_size
   in
   List.iter
     (fun e ->
-       let (op, newe, operands_for_e, chunk) = self#select_store false !a e in
+       let (op, newe, operands) = self#select_store false Word_val !a len e in
        match self#emit_expr env newe with
        | None -> assert false
-       | Some [] ->
+       | Some [||] ->
          (* immediate operands or Ispecific operation *)
-         emit_store op [||] operands_for_e chunk (size_expr env e)
+         emit_store op [||] operands (size_expr env e)
        | Some regs_for_e ->
          match op with
            Istore _ ->
@@ -1512,9 +1501,11 @@ method emit_stores env data regs_for_addr =
              let r = regs.(i) in
              let kind = if r.typ = Float then Double else Word_val in
              let new_size = size_component r.typ in
-             emit_store op [| r |] [| Ireg 0|] kind new_size
+             let operands =
+               Operands.(selected [| reg 0; mem kind !a len ~index:1 |]) in
+             emit_store op [| r |] operands new_size
            done
-         | _ -> emit_store op regs_for_e operands_for_e chunk (size_expr env e))
+         | _ -> emit_store op regs_for_e operands (size_expr env e))
     data
 
 (* Same, but in tail position *)
