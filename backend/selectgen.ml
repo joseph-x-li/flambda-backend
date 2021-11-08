@@ -989,14 +989,6 @@ method insert_moves env src dst =
     self#insert_move env src.(i) dst.(i)
   done
 
-method insert_moves_operands env src dst =
-  for i = 0 to min (Array.length src) (Array.length dst) - 1 do
-    match src.(i) with
-    | Ireg r -> self#insert_move env r dst.(i)
-    | Imem _ | Iimm _ | Iimmf _ ->
-      self#insert env (Iop Imove) [|src.(i)|] [|dst.(i)|]
-  done
-
 (* Insert moves and stack offsets for function arguments and results *)
 
 method insert_move_args env arg loc stacksize =

@@ -141,7 +141,9 @@ let end_instr () =
 let arg_reg operand =
   match operand with
   | Ireg r -> r
-  | _ -> Misc.fatal_error "Mach.arg_reg: operand is not Ireg"
+  | Imem _ -> Misc.fatal_error "Mach.arg_reg: expected Ireg, found Imem"
+  | Iimm _ -> Misc.fatal_error "Mach.arg_reg: expected Ireg, found Iimm"
+  | Iimmf _ -> Misc.fatal_error "Mach.arg_reg: expected Ireg, found Iimmf"
 
 let arg_regset operands =
   Array.fold_left (fun s -> function

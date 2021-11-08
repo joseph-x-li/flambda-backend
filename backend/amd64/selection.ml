@@ -82,6 +82,18 @@ let rec select_addr exp =
   | arg ->
       (Alinear arg, 0)
 
+let equal_operand left right =
+  match left, right with
+  | Iimm left, Iimm right -> Targetint.equal left right
+  | Iimmf left, Iimmf right -> Int64.equal left right
+  | Ireg left, Ireg right -> Reg.same_loc left right
+  | Imem left, Imem right ->
+    Option.equal Cmm.equal_memory_chunk left.chunk right.chunk &&
+    Arch.equal_addressing_mode left.addr right.addr &&
+    Array.length left.reg = Array.length right.reg &&
+    Array.for_all2 Reg.same_loc left.reg right.reg
+  | (Iimm _ | Iimmf _ | Ireg _ | Imem _),_ -> false
+
 (* Special constraints on operand and result registers *)
 
 exception Use_default
@@ -439,12 +451,30 @@ method! select_operation op args dbg =
 method! mark_c_tailcall =
   contains_calls := true
 
-(* Deal with register constraints *)
+method private insert_moves_operands env src dst =
+  for i = 0 to min (Array.length src) (Array.length dst) - 1 do
+    match src.(i), dst.(i) with
+    | Iimm left, Iimm right when Targetint.equal left right -> ()
+    | Iimmf left, Iimmf right when Int64.equal left right -> ()
+    | Ireg left, Ireg right when Reg.same_loc left right -> ()
+    | Imem left, Imem right when
+      Option.equal Cmm.equal_memory_chunk left.chunk right.chunk &&
+      Arch.equal_addressing_mode left.addr right.addr &&
+      Array.length left.reg = Array.length right.reg &&
+      Array.for_all2 Reg.same_loc left.reg right.reg -> ()
+    | (Ireg _ | Iimm _ | Iimmf _) as src, Ireg dst ->
+      self#insert env (Iop Imove) [|src|] [|dst|]
+    | Imem _, Ireg _ ->
+      Misc.fatal_error "Selection.insert_moves_operands: mem to reg"
+    | (Iimm _ | Iimmf _ | Ireg _ | Imem _), _ ->
+      Misc.fatal_error "Selection.insert_moves_operands"
+  done
 
+(* Deal with register constraints *)
 method! insert_op_debug env op dbg rs rd =
   try
     let (rsrc, rdst) = pseudoregs_for_operation op rs rd in
-    self#insert_moves_operands env rs (Array.map Mach.arg_reg rsrc);
+    self#insert_moves_operands env rs rsrc;
     self#insert_debug env (Iop op) dbg rsrc rdst;
     self#insert_moves env rdst rd;
     rd
