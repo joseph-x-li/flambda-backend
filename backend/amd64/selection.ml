@@ -93,10 +93,10 @@ let rdx = phys_reg 4
 (* arg.(0) is the same as res.(0) *)
 let same_reg_res0_arg0 arg res =
   let arg' = Array.copy arg in
-  arg'.(0) <- res.(0);
+  arg'.(0) <- Ireg res.(0);
   (arg', res)
 
-let pseudoregs_for_operation op arg res operands =
+let pseudoregs_for_operation op arg res  =
   match op with
   (* arg.(0) and res.(0) must be the same *)
     Iintop(Iadd|Isub|Imul|Iand|Ior|Ixor)
@@ -110,26 +110,26 @@ let pseudoregs_for_operation op arg res operands =
   (* For xchg, args must be a register allowing access to high 8 bit register
      (rax, rbx, rcx or rdx). Keep it simple, just force the argument in rax. *)
   | Ispecific(Ibswap 16) ->
-      ([| rax |], [| rax |])
+      ([| Ireg rax |], [| rax |])
   | Ispecific (Ibswap _) -> assert false
   (* For imulh, first arg must be in rax, rax is clobbered, and result is in
      rdx. *)
   | Iintop(Imulh _) ->
-      ([| rax; arg.(1) |], [| rdx |])
+      ([| Ireg rax; arg.(1) |], [| rdx |])
   | Iintop(Ilsl|Ilsr|Iasr) ->
      (* arg.(0) and res.(0) must be the same *)
-     if O.is_immediate operands ~index:1 then
+     if Mach.is_immediate arg.(1) then
        same_reg_res0_arg0 arg res
      else
        (* For shifts with variable shift count, second arg must be in rcx *)
-       ([|res.(0); rcx|], res)
+       ([| Ireg res.(0); Ireg rcx|], res)
   (* For div and mod, first arg must be in rax, rdx is clobbered,
      and result is in rax or rdx respectively.
      Keep it simple, just force second argument in rcx. *)
   | Iintop(Idiv) ->
-      ([| rax; rcx |], [| rax |])
+      ([| Ireg rax; Ireg rcx |], [| rax |])
   | Iintop(Imod) ->
-      ([| rax; rcx |], [| rdx |])
+      ([| Ireg rax; Ireg rcx |], [| rdx |])
   | Ifloatop(Icompf cond) ->
       (* We need to temporarily store the result of the comparison in a
          float register, but we don't want to clobber any of the inputs
@@ -144,16 +144,16 @@ let pseudoregs_for_operation op arg res operands =
          and the first argument must be in the same register.
          Second argument can in register or stack or memory. *)
       let treg = Reg.create Float in
-      [| treg; arg.(1) |], [| res.(0); treg |]
+      [| Ireg treg; arg.(1) |], [| res.(0); treg |]
   | Ispecific Irdpmc ->
   (* For rdpmc instruction, the argument must be in ecx
      and the result is in edx (high) and eax (low).
      Make it simple and force the argument in rcx, and rax and rdx clobbered *)
-    ([| rcx |], res)
+    ([| Ireg rcx |], res)
   | Ispecific (Ifloat_min | Ifloat_max)
   | Ispecific Icrc32q ->
     (* arg.(0) and res.(0) must be the same *)
-    ([|res.(0); arg.(1)|], res)
+    ([| Ireg res.(0); arg.(1)|], res)
   (* Other instructions are regular *)
   | Iintop (Ipopcnt|Iclz _|Ictz _|Icomp _|Icheckbound)
   | Ispecific (Isqrtf|Isextend32|Izextend32|Ilea
@@ -286,7 +286,13 @@ method select_addressing _chunk exp =
         (Iindexed2scaled(scale, d), Ctuple[e1; e2], 2)
 
 method! select_store is_assign chunk addr len exp =
-  let chunk_for_imm = chunk = Word_int || chunk = Word_val in
+  let chunk_for_imm =
+    match chunk with
+    | Some (Word_int | Word_val) -> true
+    | Some (Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+            | Thirtytwo_unsigned | Thirtytwo_signed | Single | Double)
+    | None -> false
+  in
   let mk_mem n =
     O.(selected [| imm n; mem (Some Word_int) addr ~len ~index:0 |]) in
   match exp with
@@ -435,15 +441,15 @@ method! mark_c_tailcall =
 
 (* Deal with register constraints *)
 
-method! insert_op_debug env op dbg rs rd operands =
+method! insert_op_debug env op dbg rs rd =
   try
-    let (rsrc, rdst) = pseudoregs_for_operation op rs rd operands in
+    let (rsrc, rdst) = pseudoregs_for_operation op rs rd in
     self#insert_moves env rs rsrc;
     self#insert_debug env (Iop op) dbg rsrc rdst operands;
-    self#insert_moves env rdst rd;
+    self#insert_moves env (Array.map (fun r -> Ireg r) rdst) rd;
     rd
   with Use_default ->
-    super#insert_op_debug env op dbg rs rd operands
+    super#insert_op_debug env op dbg rs rd
 
 end
 

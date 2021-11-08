@@ -154,7 +154,7 @@ module Operands : sig
   val in_registers : unit -> t
   val emit : t -> Reg.t array -> Mach.operand array
 
-  val is_immediate : t -> index:int -> bool
+  (* val is_immediate : t -> index:int -> bool *)
 
   (* CR gyorsh: temporary, stats for testing *)
   val report : t -> ?swap:bool -> Mach.operation -> unit
@@ -247,14 +247,14 @@ end = struct
 
   let selected r = Selected r
 
-  let is_immediate t ~index =
-    match t with
-    | In_registers -> false
-    | Selected operands ->
-      match operands.(index) with
-      | Iimm _ -> true
-      | Iimmf _ -> assert false
-      | Ireg _ | Imem _ -> false
+  (* let is_immediate t ~index =
+   *   match t with
+   *   | In_registers -> false
+   *   | Selected operands ->
+   *     match operands.(index) with
+   *     | Iimm _ -> true
+   *     | Iimmf _ -> assert false
+   *     | Ireg _ | Imem _ -> false *)
 
   (* CR gyorsh: temporary - stats about selected operands *)
   open Format
@@ -982,7 +982,7 @@ method extract =
 
 method insert_move env src dst =
   if src.stamp <> dst.stamp then
-    self#insert env (Iop Imove) [|Mach.Ireg src|] [|dst|]
+    self#insert env (Iop Imove) [|src|] [|dst|]
 
 method insert_moves env src dst =
   for i = 0 to min (Array.length src) (Array.length dst) - 1 do
@@ -995,20 +995,20 @@ method insert_move_args env arg loc stacksize =
   if stacksize <> 0 then begin
     self#insert env (Iop(Istackoffset stacksize)) [||] [||]
   end;
-  self#insert_moves env arg loc
+  self#insert_moves env (operands_of_regs arg) loc
 
 method insert_move_results env loc res stacksize =
   if stacksize <> 0 then begin
     self#insert env (Iop(Istackoffset(-stacksize))) [||] [||]
   end;
-  self#insert_moves env loc res
+  self#insert_moves env (operands_of_regs loc) res
 
 (* Add an Iop opcode. Can be overridden by processor description
    to insert moves before and after the operation, i.e. for two-address
    instructions, or instructions using dedicated registers. *)
 
 method insert_op_debug env op dbg rs rd =
-  self#insert_debug env (Iop op) dbg rd rs;
+  self#insert_debug env (Iop op) dbg rs rd;
   rd
 
 method insert_op env op rs rd =
@@ -1104,7 +1104,7 @@ method emit_expr (env:environment) exp =
             self#select_operation op simple_args dbg in
           match new_op with
             Icall_ind ->
-              let ( r1 : Reg.t array ) = self#emit_tuple env new_args in
+              let r1 = self#emit_tuple env new_args in
               let rarg = Array.sub r1 1 (Array.length r1 - 1) in
               let rd = self#regs_for ty in
               let (loc_arg, stack_ofs) = Proc.loc_arguments (Reg.typv rarg) in
@@ -1136,7 +1136,7 @@ method emit_expr (env:environment) exp =
               let loc_res =
                 self#insert_op_debug env new_op dbg
                   mach_operands (Proc.loc_external_results (Reg.typv rd)) in
-              self#insert_move_results env (operands loc_res)
+              self#insert_move_results env loc_res
                 rd stack_ofs;
               set_traps_for_raise env;
               if returns then Some rd else None
@@ -1180,7 +1180,7 @@ method emit_expr (env:environment) exp =
           let r = join env rif sif relse selse in
           let mach_operands = Operands.emit operands rarg in
           self#insert env (Iifthenelse(cond, sif#extract, selse#extract))
-                      [||] operands;
+                      mach_operands [||];
           r
       end
   | Cswitch(esel, index, ecases, _dbg) ->
@@ -1193,7 +1193,7 @@ method emit_expr (env:environment) exp =
           let r = join_array env rscases in
           self#insert env (Iswitch(index,
                                    Array.map (fun (_, s) -> s#extract) rscases))
-                      (Mach.Ireg rsel) [||];
+            (operands_of_regs rsel) [||];
           r
       end
   | Ccatch(_, [], e1) ->
@@ -1318,7 +1318,7 @@ method emit_expr (env:environment) exp =
         self#insert env
           (Itrywith(s1#extract, kind,
                     (env_handler.trap_stack,
-                     instr_cons (Iop Imove) rv [|Ireg Proc.loc_exn_bucket|]
+                     instr_cons (Iop Imove) [|Ireg Proc.loc_exn_bucket|] rv
                        (s2#extract)))) [||] [||];
         r
       in
@@ -1493,15 +1493,16 @@ method emit_stores env data regs_for_addr =
   let len = Array.length regs_for_addr in
   let a =
     ref (Arch.offset_addressing Arch.identity_addressing (-Arch.size_int)) in
-  let emit_store op regs_for_e operands chunk new_size =
+  let emit_store op regs_for_e operands new_size =
     let mach_operands =
-      Operands.emit operand (Array.append regs_for_e regs_for_addr) in
-    self#insert env (Iop op) [||] mach_operands;
+      Operands.emit operands (Array.append regs_for_e regs_for_addr) in
+    self#insert env (Iop op) mach_operands [||];
     a := Arch.offset_addressing !a new_size
   in
   List.iter
     (fun e ->
-       let (op, newe, operands) = self#select_store false Word_val !a len e in
+       let (op, newe, operands) =
+         self#select_store false (Some Word_val) !a len e in
        match self#emit_expr env newe with
        | None -> assert false
        | Some [||] ->
@@ -1511,11 +1512,11 @@ method emit_stores env data regs_for_addr =
          match op with
            Istore _ ->
            for i = 0 to Array.length regs_for_e - 1 do
-             let r = regs.(i) in
+             let r = regs_for_e.(i) in
              let kind = if r.typ = Float then Double else Word_val in
              let new_size = size_component r.typ in
              let operands =
-               Operands.(selected [| reg 0; mem kind !a len ~index:1 |]) in
+               Operands.(selected [| reg 0; mem (Some kind) !a ~len ~index:1 |]) in
              emit_store op [| r |] operands new_size
            done
          | _ -> emit_store op regs_for_e operands (size_expr env e))
@@ -1529,7 +1530,7 @@ method private emit_return (env:environment) exp (traps:trap_action list) =
   | Some r ->
       let loc = Proc.loc_results (Reg.typv r) in
       self#insert_moves env r loc;
-      self#insert env (Ireturn traps) [| Ireg loc |]  [||]
+      self#insert env (Ireturn traps) (operands_of_regs loc) [||]
 
 method emit_tail (env:environment) exp =
   match exp with
@@ -1571,7 +1572,8 @@ method emit_tail (env:environment) exp =
                 self#insert_debug env (Iop new_op) dbg mach_operands loc_res;
                 set_traps_for_raise env;
                 self#insert env (Iop(Istackoffset(-stack_ofs))) [||] [||];
-                self#insert env (Ireturn (pop_all_traps env)) [| Ireg loc_res |] [||]
+                self#insert env (Ireturn (pop_all_traps env))
+                  (operands_of_regs loc_res) [||]
               end
           | Icall_imm { func; } ->
               let r1 = self#emit_tuple env new_args in
@@ -1579,12 +1581,12 @@ method emit_tail (env:environment) exp =
               if stack_ofs = 0 && trap_stack_is_empty env then begin
                 let call = Iop (Itailcall_imm { func; }) in
                 self#insert_moves env r1 loc_arg;
-                self#insert_debug env call dbg [| Mach.Ireg loc_arg |] [||];
+                self#insert_debug env call dbg (operands_of_regs loc_arg) [||];
               end else if func = !current_function_name && trap_stack_is_empty env then begin
                 let call = Iop (Itailcall_imm { func; }) in
                 let loc_arg' = Proc.loc_parameters (Reg.typv r1) in
                 self#insert_moves env r1 loc_arg';
-                self#insert_debug env call dbg [| Ireg loc_arg'|] [||];
+                self#insert_debug env call dbg (operands_of_regs loc_arg') [||];
               end else begin
                 let rd = self#regs_for ty in
                 let loc_res = Proc.loc_results (Reg.typv rd) in
@@ -1593,7 +1595,8 @@ method emit_tail (env:environment) exp =
                 self#insert_debug env (Iop new_op) dbg mach_operands loc_res;
                 set_traps_for_raise env;
                 self#insert env (Iop(Istackoffset(-stack_ofs))) [||] [||];
-                self#insert env (Ireturn (pop_all_traps env)) [| Ireg loc_res |] [||]
+                self#insert env (Ireturn (pop_all_traps env))
+                  (operands_of_regs loc_res) [||]
               end
           | _ -> Misc.fatal_error "Selection.emit_tail"
       end
@@ -1621,7 +1624,7 @@ method emit_tail (env:environment) exp =
             Array.map (fun (case, _dbg) -> self#emit_tail_sequence env case)
               ecases
           in
-          self#insert env (Iswitch (index, cases)) [| Ireg rsel |] [||]
+          self#insert env (Iswitch (index, cases)) (operands_of_regs rsel) [||]
       end
   | Ccatch(_, [], e1) ->
       self#emit_tail env e1
@@ -1686,8 +1689,8 @@ method emit_tail (env:environment) exp =
         self#insert env
           (Itrywith(s1, kind,
                     (env_handler.trap_stack,
-                     instr_cons (Iop Imove) rv
-                       [|Ireg Proc.loc_exn_bucket|] s2)))
+                     instr_cons (Iop Imove)
+                       [|Ireg Proc.loc_exn_bucket|] rv s2)))
           [||] [||]
       in
       let env = env_add v rv env in

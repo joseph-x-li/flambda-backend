@@ -155,6 +155,7 @@ val arg_reg : operand -> Reg.t
 val arg_regset : operand array -> Reg.Set.t
 
 val same_loc : operand -> Reg.t -> bool
+val is_immediate : operand -> bool
 
 val dummy_instr: instruction
 val end_instr: unit -> instruction

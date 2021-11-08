@@ -161,6 +161,10 @@ let same_loc operand reg =
     false
   | Ireg r -> Reg.same_loc r reg
 
+let is_immediate = function
+  | Iimm _ | Iimmf _ -> true
+  | Ireg _ | Imem _ -> false
+
 let instr_cons d o r n =
   { desc = d; next = n; res = r; operands = o;
     dbg = Debuginfo.none; live = Reg.Set.empty;
