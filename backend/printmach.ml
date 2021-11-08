@@ -214,7 +214,8 @@ let operation op arg ppf res =
 let rec instr ppf i =
   if !Clflags.dump_live then begin
     fprintf ppf "@[<1>{%a" regsetaddr i.live;
-    if Array.length i.operands > 0 then fprintf ppf "@ +@ %a" operands i.operands;
+    if Array.length i.operands > 0 then
+      fprintf ppf "@ +@ %a" regsetaddr (Mach.arg_regset i.operands);
     fprintf ppf "}@]@,";
     if !Clflags.dump_avail then begin
       let module RAS = Reg_availability_set in
