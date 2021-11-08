@@ -33,11 +33,22 @@ type op_class =
        valnums = operation(valnums)
    plus a mapping from registers to valnums (value numbers). *)
 
-type rhs = operation * operand array * valnum array
+type rhs = operation * valnum array
+
+type rhs_operand =
+  | Vimm of Targetint.t
+  | Vimmf of Int64.t
+  | Vreg of valnum
+  | Vmem of { chunk : Cmm.memory_chunk option;
+              addr : Arch.addressing_mode;
+              reg : valnum array;
+            }
+
+type element = Op of rhs | Operand of rhs_operand
 
 module Equations = struct
   module Rhs_map =
-    Map.Make(struct type t = rhs let compare = Stdlib.compare end)
+    Map.Make(struct type t = element let compare = Stdlib.compare end)
 
   type 'a t =
     { load_equations : 'a Rhs_map.t;
@@ -122,6 +133,42 @@ let find_equation op_class n rhs =
   with Not_found ->
     None
 
+(** [valnum_operand] and [valnum_operands] return an array of value numbers
+    associated with the registers referred to by the operands. Similar
+    to [valnum_reg] and [valnum_regs]. *)
+let valnum_operand n operand =
+  let (n1, (rhs_operand : rhs_operand), op_class) =
+    match (operand : Mach.operand) with
+    | Ireg r ->
+      let (n1,v1) = valnum_reg n r in
+      (n1, Vreg v1, Op_pure)
+    | Imem { chunk; addr; reg } ->
+      let (n1, reg) = valnum_regs n reg in
+      (n1, Vmem { chunk; addr; reg }, Op_load)
+    | Iimm i -> (n, Vimm i, Op_pure)
+    | Iimmf f -> (n, Vimmf f, Op_pure)
+  in
+  match find_equation op_class n1 (Operand rhs_operand) with
+  | Some vres ->
+    (* This operand was computed earlier. *)
+    (* CR gyorsh: here we can further optimize, for example
+       check if there is a register that holds [vres] and replace
+       the operand with the register. *)
+    assert (Array.length vres = 1);
+    (n1, vres.(0))
+  | None ->
+    (* We haven't seen this operand before. *)
+    (* Generate a fresh value number [v] and record the equation
+       [v = rhs_operand]. There is no register associated with [v]. *)
+    let v2 = n1.num_next in
+    let n2 = { n1 with num_next = v2 + 1 } in
+    let num_eqs = Equations.add op_class (Operand rhs_operand) [| v2 |]
+                    n2.num_eqs in
+    ({ n2 with num_eqs }, v2)
+
+let valnum_operands n rs =
+  array_fold_transf valnum_operand n rs
+
 (* Find a register containing the given value number. *)
 
 let find_reg_containing n v =
@@ -201,17 +248,16 @@ let kill_addr_regs n =
 
 (* Prepend a set of moves before [i] to assign [srcs] to [dsts].  *)
 
-let insert_single_move i src dst = instr_cons (Iop Imove) [|src|] [|dst|] i
+let insert_single_move i src dst = instr_cons (Iop Imove) [|Ireg src|] [|dst|] i
 
 let insert_move srcs dsts i =
   match Array.length srcs with
   | 0 -> i
-  | 1 -> instr_cons (Iop Imove) srcs dsts i
+  | 1 -> instr_cons (Iop Imove) (Array.map (fun r -> Ireg r) srcs) dsts i
   | _ -> (* Parallel move: first copy srcs into tmps one by one,
             then copy tmps into dsts one by one *)
          let tmps = Reg.createv_like dsts in
-         let tmp_operands = Array.map (fun r -> Ireg r) tmps in
-         let i1 = array_fold2 insert_single_move i tmp_operands dsts in
+         let i1 = array_fold2 insert_single_move i tmps dsts in
          array_fold2 insert_single_move i1 srcs tmps
 
 let rec split3 = function
@@ -263,6 +309,8 @@ method is_cheap_operation op =
   match op with
   | Iconst_int _ -> true
   | _ -> false
+
+(* CR gyorsh: is it worth CSEing memory operands into loads? *)
 
 (* Forget all equations involving memory loads.  Performed after a
    non-initializing store *)
@@ -317,15 +365,17 @@ method private cse n i k =
   | Iop op ->
       begin match self#class_of_operation op i.operands with
       | (Op_pure | Op_checkbound | Op_load) as op_class ->
-          let (n1, varg) = valnum_regs n i.arg in
-          let n2 = set_unknown_regs n1 (Proc.destroyed_at_oper i) in
-          begin match find_equation op_class n1 (op, i.operands, varg) with
+          let (n1, varg) = valnum_operands n i.operands in
+          let n2 = set_unknown_regs n1
+                     (Proc.destroyed_at_oper i.desc i.operands) in
+          begin match find_equation op_class n1 (Op (op, varg)) with
           | Some vres ->
               (* This operation was computed earlier. *)
               (* Are there registers that hold the results computed earlier? *)
               begin match find_regs_containing n1 vres with
               | Some res when (not (self#is_cheap_operation op))
-                           && (not (Proc.regs_are_volatile res)) ->
+                           && (not (Proc.regs_are_volatile
+                                      (Reg.set_of_array res))) ->
                   (* We can replace res <- op args with r <- move res,
                      provided res are stable (non-volatile) registers.
                      If the operation is very cheap to compute, e.g.
@@ -344,19 +394,21 @@ method private cse n i k =
               end
           | None ->
               (* This operation produces a result we haven't seen earlier. *)
-              let n3 = set_fresh_regs n2 i.res (op, i.operands, varg) op_class in
+              let n3 = set_fresh_regs n2 i.res (Op (op,varg)) op_class in
               self#cse n3 i.next (fun next -> k (Mach.copy i ~next))
           end
       | Op_store false | Op_other ->
           (* An initializing store or an "other" operation do not invalidate
              any equations, but we do not know anything about the results. *)
-         let n1 = set_unknown_regs n (Proc.destroyed_at_oper i) in
+         let n1 = set_unknown_regs n
+                   (Proc.destroyed_at_oper i.desc i.operands) in
          let n2 = set_unknown_regs n1 i.res in
          self#cse n2 i.next (fun next -> k (Mach.copy i ~next))
       | Op_store true ->
           (* A non-initializing store can invalidate
              anything we know about prior loads. *)
-         let n1 = set_unknown_regs n (Proc.destroyed_at_oper i) in
+         let n1 = set_unknown_regs n
+                   (Proc.destroyed_at_oper i.desc i.operands) in
          let n2 = set_unknown_regs n1 i.res in
          let n3 = self#kill_loads n2 in
          self#cse n3 i.next (fun next -> k (Mach.copy i ~next))
@@ -364,14 +416,14 @@ method private cse n i k =
   (* For control structures, we set the numbering to empty at every
      join point, but propagate the current numbering across fork points. *)
   | Iifthenelse(test, ifso, ifnot) ->
-      let n1 = set_unknown_regs n (Proc.destroyed_at_oper i) in
+      let n1 = set_unknown_regs n (Proc.destroyed_at_oper i.desc i.operands) in
       self#cse n1 ifso (fun ifso ->
         self#cse n1 ifnot (fun ifnot ->
           self#cse empty_numbering i.next (fun next ->
             let desc = Iifthenelse(test, ifso, ifnot) in
             k (Mach.copy i ~desc ~next))))
   | Iswitch(index, cases) ->
-      let n1 = set_unknown_regs n (Proc.destroyed_at_oper i) in
+      let n1 = set_unknown_regs n (Proc.destroyed_at_oper i.desc i.operands) in
       self#cse_array n1 cases (fun cases ->
         self#cse empty_numbering i.next (fun next ->
           let desc = Iswitch(index, cases) in
