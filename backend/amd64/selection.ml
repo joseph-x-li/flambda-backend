@@ -452,16 +452,19 @@ method! mark_c_tailcall =
   contains_calls := true
 
 method private insert_moves_operands env src dst =
+  let eq_stamp : Reg.t -> Reg.t -> bool =
+    fun r1 r2 -> Int.equal r1.stamp r2.stamp
+  in
   for i = 0 to min (Array.length src) (Array.length dst) - 1 do
     match src.(i), dst.(i) with
     | Iimm left, Iimm right when Targetint.equal left right -> ()
     | Iimmf left, Iimmf right when Int64.equal left right -> ()
-    | Ireg left, Ireg right when Reg.same_loc left right -> ()
+    | Ireg left, Ireg right when eq_stamp left right -> ()
     | Imem left, Imem right when
       Option.equal Cmm.equal_memory_chunk left.chunk right.chunk &&
       Arch.equal_addressing_mode left.addr right.addr &&
       Array.length left.reg = Array.length right.reg &&
-      Array.for_all2 Reg.same_loc left.reg right.reg -> ()
+      Array.for_all2 eq_stamp left.reg right.reg -> ()
     | (Ireg _ | Iimm _ | Iimmf _) as src, Ireg dst ->
       self#insert env (Iop Imove) [|src|] [|dst|]
     | Imem _, Ireg _ ->
