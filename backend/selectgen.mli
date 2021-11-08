@@ -208,6 +208,7 @@ class virtual selector_generic : object
     environment -> Mach.instruction_desc -> Debuginfo.t ->
        Mach.operand array -> Reg.t array -> unit
   method insert_move : environment -> Mach.operand -> Reg.t -> unit
+  method insert_move : environment -> Mach.operand -> Reg.t -> unit
   method insert_move_args :
     environment -> Reg.t array -> Reg.t array -> int -> unit
   method insert_move_results :

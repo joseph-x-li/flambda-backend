@@ -980,13 +980,17 @@ method extract =
 
 (* Insert a sequence of moves from one pseudoreg set to another. *)
 
-method insert_move env src dst =
+method private insert_move env src dst =
   if src.stamp <> dst.stamp then
+    self#insert env (Iop Imove) [|Ireg src|] [|dst|]
+
+method insert_move_operand env src dst =
+  if (Mach.arg_reg src).stamp <> dst.stamp then
     self#insert env (Iop Imove) [|src|] [|dst|]
 
 method insert_moves env src dst =
   for i = 0 to min (Array.length src) (Array.length dst) - 1 do
-    self#insert_move env src.(i) dst.(i)
+    self#insert_move_operand env src.(i) dst.(i)
   done
 
 (* Insert moves and stack offsets for function arguments and results *)
@@ -1080,7 +1084,7 @@ method emit_expr (env:environment) exp =
         None -> None
       | Some r1 ->
           let rd = [|Proc.loc_exn_bucket|] in
-          self#insert env (Iop Imove) (operands_of_regs r1) rd;
+          self#insert env (Iop Imove) r1 rd;
           self#insert_debug env  (Iraise k) dbg
             [| Ireg Proc.loc_exn_bucket |] [||];
           set_traps_for_raise env;
