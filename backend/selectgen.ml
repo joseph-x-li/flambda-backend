@@ -980,17 +980,21 @@ method extract =
 
 (* Insert a sequence of moves from one pseudoreg set to another. *)
 
-method private insert_move env src dst =
+method insert_move env src dst =
   if src.stamp <> dst.stamp then
     self#insert env (Iop Imove) [|Ireg src|] [|dst|]
 
-method insert_move_operand env src dst =
-  if (Mach.arg_reg src).stamp <> dst.stamp then
-    self#insert env (Iop Imove) [|src|] [|dst|]
-
 method insert_moves env src dst =
   for i = 0 to min (Array.length src) (Array.length dst) - 1 do
-    self#insert_move_operand env src.(i) dst.(i)
+    self#insert_move env src.(i) dst.(i)
+  done
+
+method insert_moves_operands env src dst =
+  for i = 0 to min (Array.length src) (Array.length dst) - 1 do
+    match src.(i) with
+    | Ireg r -> self#insert_move env r dst.(i)
+    | Imem _ | Iimm _ | Iimmf _ ->
+      self#insert env (Iop Imove) [|src.(i)|] [|dst.(i)|]
   done
 
 (* Insert moves and stack offsets for function arguments and results *)
@@ -999,13 +1003,13 @@ method insert_move_args env arg loc stacksize =
   if stacksize <> 0 then begin
     self#insert env (Iop(Istackoffset stacksize)) [||] [||]
   end;
-  self#insert_moves env (operands_of_regs arg) loc
+  self#insert_moves env arg loc
 
 method insert_move_results env loc res stacksize =
   if stacksize <> 0 then begin
     self#insert env (Iop(Istackoffset(-stacksize))) [||] [||]
   end;
-  self#insert_moves env (operands_of_regs loc) res
+  self#insert_moves env loc res
 
 (* Add an Iop opcode. Can be overridden by processor description
    to insert moves before and after the operation, i.e. for two-address
@@ -1084,7 +1088,7 @@ method emit_expr (env:environment) exp =
         None -> None
       | Some r1 ->
           let rd = [|Proc.loc_exn_bucket|] in
-          self#insert env (Iop Imove) r1 rd;
+          self#insert env (Iop Imove) (operands_of_regs r1) rd;
           self#insert_debug env  (Iraise k) dbg
             [| Ireg Proc.loc_exn_bucket |] [||];
           set_traps_for_raise env;
@@ -1296,7 +1300,8 @@ method emit_expr (env:environment) exp =
               (* Ccatch registers must not contain out of heap pointers *)
               Array.iter (fun reg -> assert(reg.typ <> Addr)) src;
               self#insert_moves env src tmp_regs ;
-              self#insert_moves env tmp_regs (Array.concat dest_args) ;
+              self#insert_moves env tmp_regs
+                (Array.concat dest_args) ;
               self#insert env (Iexit (nfail, traps)) [||] [||];
               set_traps nfail trap_stack env.trap_stack traps;
               None

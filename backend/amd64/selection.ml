@@ -444,9 +444,9 @@ method! mark_c_tailcall =
 method! insert_op_debug env op dbg rs rd =
   try
     let (rsrc, rdst) = pseudoregs_for_operation op rs rd in
-    self#insert_moves env rs (Array.map Mach.arg_reg rsrc);
+    self#insert_moves_operands env rs (Array.map Mach.arg_reg rsrc);
     self#insert_debug env (Iop op) dbg rsrc rdst;
-    self#insert_moves env (Array.map (fun r -> Ireg r) rdst) rd;
+    self#insert_moves env rdst rd;
     rd
   with Use_default ->
     super#insert_op_debug env op dbg rs rd
