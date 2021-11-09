@@ -79,8 +79,12 @@ method private makeregs rv =
 method makereg_operand o =
   match o with
   | Iimm _ | Iimmf _ -> o
-  | Ireg r -> Ireg (self#makereg r)
-  | Imem m -> Imem { m with reg = self#makeregs m.reg }
+  | Ireg r -> if Reg.is_stack r then Ireg (self#makereg r) else o
+  | Imem m ->
+    let reg =
+      Array.map (fun r -> if Reg.is_stack r then self#makereg r else r) m.reg
+    in
+    Imem { m with reg }
 
 method private makeregs_operands ov =
   Array.init (Array.length ov) (fun i -> self#makereg_operand ov.(i))
@@ -96,7 +100,11 @@ method makeregs_for_memory_operands operands =
   Array.map (fun operand ->
     match operand with
     | Ireg _ | Iimm _ | Iimmf _ -> operand
-    | Imem m -> Imem { m with reg = self#makeregs m.reg })
+    | Imem m ->
+      let reg =
+        Array.map (fun r -> if Reg.is_stack r then self#makereg r else r) m.reg
+      in
+      Imem { m with reg })
     operands;
 
 method reload_operation op res operands =
@@ -118,7 +126,7 @@ method reload_operation op res operands =
     | Iimm _ | Iimmf _ -> (operands, res)
     | Imem _ ->
       Misc.fatal_errorf "Reloadgen.reload_operation: \
-                         Imove from memory not supported, use Istore."
+                         Imove to/from memory not supported, use Iload/Istore."
     end
   | Iprobe _ ->
     (* No constraints on where the arguments reside,
