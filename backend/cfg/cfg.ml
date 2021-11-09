@@ -269,9 +269,12 @@ let dump_terminator ppf ?(sep = "\n") ti =
     fprintf ppf "if uo goto %d%s" uo sep
   | Int_test { lt; eq; gt; is_signed } ->
     let signed = if is_signed then " s" else " u" in
-    fprintf ppf "if <%s %a goto %d%s" signed Printmach.operands ti.operands lt sep;
-    fprintf ppf "if =%s %a goto %d%s" signed Printmach.operands ti.operands eq sep;
-    fprintf ppf "if >%s %a goto %d%s" signed Printmach.operands ti.operands gt sep
+    fprintf ppf "if <%s %a goto %d%s" signed Printmach.operands ti.operands lt
+      sep;
+    fprintf ppf "if =%s %a goto %d%s" signed Printmach.operands ti.operands eq
+      sep;
+    fprintf ppf "if >%s %a goto %d%s" signed Printmach.operands ti.operands gt
+      sep
   | Switch labels ->
     fprintf ppf "switch%s" sep;
     for i = 0 to Array.length labels - 1 do

@@ -595,8 +595,7 @@ let rec create_blocks (t : t) (i : L.instruction) (block : C.basic_block)
     | Iconst_int _ | Iconst_float _ | Iconst_symbol _ | Icall_ind | Icall_imm _
     | Iextcall _ | Istackoffset _
     | Iload (_, _)
-    | Istore _
-    | Ialloc _ | Iintop _ | Iopaque | Iprobe _ | Iprobe_is_enabled _
+    | Istore _ | Ialloc _ | Iintop _ | Iopaque | Iprobe _ | Iprobe_is_enabled _
     | Ispecific _ | Iname_for_debugger _ ->
       let desc = to_basic mop in
       block.body <- create_instruction t desc i ~trap_depth :: block.body;
