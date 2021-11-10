@@ -25,6 +25,14 @@ module type Flambda_backend_options = sig
   val _no_ocamlcfg : unit -> unit
 end
 
+module Flambda_backend_options = struct
+  let set r () = r := true
+  let clear r () = r := false
+
+  let _ocamlcfg = set Flambda_backend_flags.use_ocamlcfg
+  let _no_ocamlcfg = clear Flambda_backend_flags.use_ocamlcfg
+end
+
 module Make_flambda_backend_options (F : Flambda_backend_options) =
 struct
   let list2 = [
@@ -43,8 +51,6 @@ struct
   let read_param = function
     | "ocamlcfg" -> set "ocamlcfg" Flambda_backend_flags.use_ocamlcfg
     | _ -> None
-
-  let () = Compenv.set_extra_params read_param
 end
 
 module type Optcomp_options = sig
@@ -75,21 +81,12 @@ module Make_opttop_options (F : Opttop_options) = struct
 end
 
 module Default = struct
-
-  let set r () = r := true
-  let clear r () = r := false
-
-  module Flambda_backend = struct
-    let _ocamlcfg = set Flambda_backend_flags.use_ocamlcfg
-    let _no_ocamlcfg = clear Flambda_backend_flags.use_ocamlcfg
-  end
-
   module Optmain = struct
     include Main_args.Default.Optmain
-    include Flambda_backend
+    include Flambda_backend_options
   end
   module Opttopmain = struct
     include Main_args.Default.Opttopmain
-    include Flambda_backend
+    include Flambda_backend_options
   end
 end

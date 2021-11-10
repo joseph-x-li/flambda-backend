@@ -57,6 +57,7 @@ let main argv ppf ~flambda2 =
     Format.pp_set_margin Format.std_formatter columns;
     Format.pp_set_margin Format.err_formatter columns);
   match
+    Compenv.set_extra_params Options.read_param;
     Compenv.readenv ppf Before_args;
     Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
     Clflags.add_arguments __LOC__
