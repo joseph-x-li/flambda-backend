@@ -32,6 +32,10 @@
 
 (copy_files# driver/optmaindriver.ml{,i})
 
+(copy_files# driver/flambda_backend_args.ml{,i})
+
+(copy_files# utils/flambda_backend_flags.ml{,i})
+
 (copy_files# file_formats/cmx_format.mli)
 
 (copy_files# file_formats/linear_format.ml{,i})
@@ -241,9 +245,12 @@
   optcompile
   optmaindriver
   compiler_hooks
+  flambda_backend_args
   ;; printer/
   printast_with_mappings
   location_tracker_formatter
+  ;; utils/
+  flambda_backend_flags
   ; The driver should be in here too, but is not at present.  This might
   ; be tricky because it has a different name...
   )
@@ -1250,7 +1257,18 @@
   (.ocamloptcomp.objs/byte/location_tracker_formatter.cmt as compiler-libs/location_tracker_formatter.cmt)
   (.ocamloptcomp.objs/byte/location_tracker_formatter.cmti as compiler-libs/location_tracker_formatter.cmti)
   (.ocamloptcomp.objs/native/location_tracker_formatter.cmx as compiler-libs/location_tracker_formatter.cmx)
-  ))
+  (flambda_backend_flags.mli as compiler-libs/flambda_backend_flags.mli)
+  (.ocamloptcomp.objs/native/flambda_backend_flags.cmx as compiler-libs/flambda_backend_flags.cmx)
+  (.ocamloptcomp.objs/byte/flambda_backend_flags.cmi as compiler-libs/flambda_backend_flags.cmi)
+  (.ocamloptcomp.objs/byte/flambda_backend_flags.cmo as compiler-libs/flambda_backend_flags.cmo)
+  (.ocamloptcomp.objs/byte/flambda_backend_flags.cmt as compiler-libs/flambda_backend_flags.cmt)
+  (.ocamloptcomp.objs/byte/flambda_backend_flags.cmti as compiler-libs/flambda_backend_flags.cmti)
+  (flambda_backend_args.mli as compiler-libs/flambda_backend_args.mli)
+  (.ocamloptcomp.objs/native/flambda_backend_args.cmx as compiler-libs/flambda_backend_args.cmx)
+  (.ocamloptcomp.objs/byte/flambda_backend_args.cmi as compiler-libs/flambda_backend_args.cmi)
+  (.ocamloptcomp.objs/byte/flambda_backend_args.cmo as compiler-libs/flambda_backend_args.cmo)
+  (.ocamloptcomp.objs/byte/flambda_backend_args.cmt as compiler-libs/flambda_backend_args.cmt)
+  (.ocamloptcomp.objs/byte/flambda_backend_args.cmti as compiler-libs/flambda_backend_args.cmti)))
 (install
  (section lib)
  (package ocaml)

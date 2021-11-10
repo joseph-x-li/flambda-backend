@@ -36,7 +36,8 @@ let backend = (module Backend : Backend_intf.S)
 
 let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 
-module Options = Main_args.Make_optcomp_options (Main_args.Default.Optmain)
+module Options = Flambda_backend_args.Make_optcomp_options
+        (Flambda_backend_args.Default.Optmain)
 
 let main argv ppf ~flambda2 =
   native_code := true;
