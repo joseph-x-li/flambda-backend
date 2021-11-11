@@ -25,37 +25,37 @@
  (modules cvt_emit)
  (mode    fallback))
 
-(executable
-  (name ocamldep_byte)
-  (modes byte)
-  (modules ocamldep_byte)
-  ; See note in the toplevel dune file about this.
-  (flags (:standard -nostdlib -cclib "-L ../runtime" -cclib -lcamlrun))
-  (libraries ocamlcommon ocamlbytecomp))
+; (executable
+;   (name ocamldep_byte)
+;   (modes byte)
+;   (modules ocamldep_byte)
+;   ; See note in the toplevel dune file about this.
+;   (flags (:standard -nostdlib -cclib "-L ../runtime" -cclib -lcamlrun))
+;   (libraries ocamlcommon ocamlbytecomp))
 
-(rule
-  (targets ocamldep_byte.ml)
-  (action (copy ocamldep.ml %{targets})))
+; (rule
+;   (targets ocamldep_byte.ml)
+;   (action (copy ocamldep.ml %{targets})))
 
-(executable
-  (name ocamldep_native)
-  (modes native)
-  (flags -nostdlib)
-  (modules ocamldep_native)
-  (libraries ocamlcommon ocamlbytecomp runtime_native))
+; (executable
+;   (name ocamldep_native)
+;   (modes native)
+;   (flags -nostdlib)
+;   (modules ocamldep_native)
+;   (libraries ocamlcommon ocamlbytecomp runtime_native))
 
-(rule
-  (targets ocamldep_native.ml)
-  (action (copy ocamldep.ml %{targets})))
+; (rule
+;   (targets ocamldep_native.ml)
+;   (action (copy ocamldep.ml %{targets})))
 
-(install
-  (files
-    (ocamldep_byte.bc as ocamldep.byte)
-    (ocamldep_native.exe as ocamldep)
-    (ocamldep_native.exe as ocamldep.opt)
-  )
-  (section bin)
-  (package ocaml))
+; (install
+;   (files
+;     (ocamldep_byte.bc as ocamldep.byte)
+;     (ocamldep_native.exe as ocamldep)
+;     (ocamldep_native.exe as ocamldep.opt)
+;   )
+;   (section bin)
+;   (package ocaml))
 
 (executable
   (name cmpbyt)

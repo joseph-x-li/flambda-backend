@@ -38,6 +38,8 @@
 
 (copy_files# driver/flambda_backend_flags.ml{,i})
 
+(copy_files# ocaml/tools/ocamldep.ml{,i})
+
 (copy_files# file_formats/cmx_format.mli)
 
 (copy_files# file_formats/linear_format.ml{,i})
@@ -354,6 +356,39 @@
  ))
  (libraries ocamlbytecomp flambda_backend_common ocamlcommon runtime_native stdlib)
  (modules flambda_backend_main_native))
+
+(executable
+  (name ocamldep_byte)
+  (modes byte)
+  (modules ocamldep_byte)
+  ; See note in the toplevel dune file about this.
+  (flags (:standard -nostdlib -cclib "-L ../runtime" -cclib -lcamlrun))
+  (libraries flambda_backend_common ocamlcommon ocamlbytecomp))
+
+(rule
+  (targets ocamldep_byte.ml)
+  (action (copy ocamldep.ml %{targets})))
+
+(executable
+  (name ocamldep_native)
+  (modes native)
+  (flags -nostdlib)
+  (modules ocamldep_native)
+  (libraries flambda_backend_common ocamlcommon ocamlbytecomp runtime_native))
+
+(rule
+  (targets ocamldep_native.ml)
+  (action (copy ocamldep.ml %{targets})))
+
+(install
+  (files
+    (ocamldep_byte.bc as ocamldep.byte)
+    (ocamldep_native.exe as ocamldep)
+    (ocamldep_native.exe as ocamldep.opt)
+  )
+  (section bin)
+  (package ocaml))
+
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
 ; must be kept in sync with each other and in a topological order.

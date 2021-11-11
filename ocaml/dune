@@ -101,22 +101,22 @@
     errors compile maindriver
  ))
 
-(executable
- (name main)
- (modes byte)
- ; We need to use ocamlmklib in "custom" mode for the runtime library
- ; in bytecode otherwise the compiler will end up looking for dllruntime.so
- ; which doesn't exist.  Since we don't seem to be able to do this, we
- ; currently don't add "runtime_byte" as a "libraries" dependency, but
- ; instead explicitly provide "-cclib" flags to pull it in.
- (flags (
-   -nostdlib -strict-sequence -principal -absname -w +a-4-9-40-41-42-44-45-48-66
-   -warn-error A -bin-annot -safe-string -strict-formats
-   -cclib "-I runtime" -cclib "-L runtime" -cclib -lcamlrun
- ))
- (link_deps (file stdlib/camlheader) (file runtime/libcamlrun.a))
- (libraries ocamlbytecomp ocamlcommon stdlib)
- (modules main))
+; (executable
+;  (name main)
+;  (modes byte)
+;  ; We need to use ocamlmklib in "custom" mode for the runtime library
+;  ; in bytecode otherwise the compiler will end up looking for dllruntime.so
+;  ; which doesn't exist.  Since we don't seem to be able to do this, we
+;  ; currently don't add "runtime_byte" as a "libraries" dependency, but
+;  ; instead explicitly provide "-cclib" flags to pull it in.
+;  (flags (
+;    -nostdlib -strict-sequence -principal -absname -w +a-4-9-40-41-42-44-45-48-66
+;    -warn-error A -bin-annot -safe-string -strict-formats
+;    -cclib "-I runtime" -cclib "-L runtime" -cclib -lcamlrun
+;  ))
+;  (link_deps (file stdlib/camlheader) (file runtime/libcamlrun.a))
+;  (libraries ocamlbytecomp ocamlcommon stdlib)
+;  (modules main))
 
 (executable
  (name main_native)
