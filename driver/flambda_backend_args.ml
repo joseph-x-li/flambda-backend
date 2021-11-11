@@ -43,11 +43,11 @@ end
 
 module Extra_params = struct
   let set name option =
-    Some (fun ppf _position name s ->
+    Some (fun ppf _position _name s ->
        Compenv.setter ppf (fun b -> b) name [ option ] s)
 
-  let clear name option =
-    Some (fun ppf _position name s ->
+  let _clear name option =
+    Some (fun ppf _position _name s ->
         Compenv.setter ppf (fun b -> not b) name [ option ] s)
 
   let read_param = function
@@ -63,10 +63,6 @@ end
 module type Opttop_options = sig
   include Main_args.Opttop_options
   include Flambda_backend_options
-end
-
-module Opttopmain = struct
-  include Main_args.Default.Opttopmain
 end
 
 module Make_optcomp_options (F : Optcomp_options) =
