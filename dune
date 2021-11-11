@@ -28,6 +28,8 @@
 
 (copy_files# driver/flambda_backend_main.ml{,i})
 
+(copy_files# driver/flambda_backend_optmain.ml{,i})
+
 (copy_files# driver/compiler_hooks.ml{,i})
 
 (copy_files# driver/optmaindriver.ml{,i})
@@ -257,7 +259,7 @@
  (libraries ocamlcommon stdlib flambda2_identifiers flambda2_cmx))
 
 (executable
- (name flambda_backend_main)
+ (name flambda_backend_optmain)
  (modes byte)
  (flags
   (:standard
@@ -281,15 +283,15 @@
   ocamloptcomp
   ocamlcommon
   stdlib)
- (modules flambda_backend_main))
+ (modules flambda_backend_optmain))
 
 (rule
- (targets flambda_backend_main_native.ml)
+ (targets flambda_backend_optmain_native.ml)
  (action
-  (copy driver/flambda_backend_main.ml %{targets})))
+  (copy driver/flambda_backend_optmain.ml %{targets})))
 
 (executable
- (name flambda_backend_main_native)
+ (name flambda_backend_optmain_native)
  (modes native)
  (flags
   (:standard -principal -nostdlib))
@@ -303,7 +305,39 @@
   ocamlcommon
   stdlib
   runtime_native)
- (modules flambda_backend_main_native))
+ (modules flambda_backend_optmain_native))
+
+(executable
+ (name flambda_backend_main)
+ (modes byte)
+ ; We need to use ocamlmklib in "custom" mode for the runtime library
+ ; in bytecode otherwise the compiler will end up looking for dllruntime.so
+ ; which doesn't exist.  Since we don't seem to be able to do this, we
+ ; currently don't add "runtime_byte" as a "libraries" dependency, but
+ ; instead explicitly provide "-cclib" flags to pull it in.
+ (flags (
+   -nostdlib -strict-sequence -principal -absname -w +a-4-9-40-41-42-44-45-48-66
+   -warn-error A -bin-annot -safe-string -strict-formats
+   -cclib "-I runtime" -cclib "-L runtime" -cclib -lcamlrun
+ ))
+ (link_deps (file stdlib/camlheader) (file runtime/libcamlrun.a))
+ (libraries ocamlbytecomp ocamlcommon stdlib)
+ (modules main))
+
+(rule
+ (targets flambda_backend_main_native.ml)
+ (action
+  (copy driver/flambda_backend_main.ml %{targets})))
+
+(executable
+ (name flambda_backend_main_native)
+ (modes native)
+ (flags (
+   -nostdlib -strict-sequence -principal -absname -w +a-4-9-40-41-42-44-45-48-66
+   -warn-error A -bin-annot -safe-string -strict-formats
+ ))
+ (libraries ocamlbytecomp ocamlcommon runtime_native stdlib)
+ (modules main_native))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
 ; must be kept in sync with each other and in a topological order.
@@ -385,9 +419,12 @@
 
 (install
  (files
-  (flambda_backend_main.bc as ocamlopt.byte)
-  (flambda_backend_main_native.exe as ocamlopt)
-  (flambda_backend_main_native.exe as ocamlopt.opt))
+  (flambda_backend_main.bc as ocamlc.byte)
+  (flambda_backend_main_native.exe as ocamlc)
+  (flambda_backend_main_native.exe as ocamlc.opt)
+  (flambda_backend_optmain.bc as ocamlopt.byte)
+  (flambda_backend_optmain_native.exe as ocamlopt)
+  (flambda_backend_optmain_native.exe as ocamlopt.opt))
  (section bin)
  (package ocaml))
 

@@ -156,15 +156,6 @@
        toplevel/expunge.exe
        ))
 
-(install
-  (files
-    (main.bc as ocamlc.byte)
-    (main_native.exe as ocamlc)
-    (main_native.exe as ocamlc.opt)
-  )
-  (section bin)
-  (package ocaml))
-
 ; For the moment we don't install optmain.{cmo,cmx,o} and opttopstart.{cmx,o}.
 ; When built with Dune, these have the "dune exe" module prefixes, so won't
 ; be named as a client would expect.  There should also be a patch upstream
