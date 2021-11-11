@@ -27,16 +27,8 @@ module type Opttop_options = sig
   include Flambda_backend_options
 end
 
-module type Arg_list = sig
-    include Main_args.Arg_list
-    val list : (string * Arg.spec * string) list
-    val read_param : string ->
-      (Format.formatter -> Compenv.readenv_position -> string -> string -> unit)
-        option
-end;;
-
-module Make_optcomp_options : Optcomp_options -> Arg_list;;
-module Make_opttop_options : Opttop_options -> Arg_list;;
+module Make_optcomp_options : Optcomp_options -> Main_args.Arg_list;;
+module Make_opttop_options : Opttop_options -> Main_args.Arg_list;;
 
 module Default: sig
   module Optmain: Optcomp_options
