@@ -53,12 +53,6 @@ module Extra_params = struct
   let read_param = function
     | "ocamlcfg" -> set "ocamlcfg" Flambda_backend_flags.use_ocamlcfg
     | _ -> None
-
-  (* This is installed unconditionally for native and bytecode and all tools,
-     to avoid warnings about flags that are only supported in flambda-backend,
-     similarly to the treatment of native-only flags in
-     [ocaml/driver/compenv.ml] *)
-  let () = Compenv.set_extra_params read_param;
 end
 
 module type Optcomp_options = sig

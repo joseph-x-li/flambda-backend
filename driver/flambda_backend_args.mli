@@ -34,3 +34,9 @@ module Default: sig
   module Optmain: Optcomp_options
   module Opttopmain: Opttop_options
 end
+
+module Extra_params : sig
+  val read_param : string ->
+      (Format.formatter -> Compenv.readenv_position -> string -> string -> unit)
+        option
+end
