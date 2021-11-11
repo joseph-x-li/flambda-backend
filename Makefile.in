@@ -31,6 +31,12 @@ dune=@dune@
 # make, since it seems faster.
 #
 # CR-someday mshinwell: We should replace this with a coldstart using dune.
+#
+# stage0 compiler can discard flambda-backend flags from OCAMLPARAM
+# by listing them in "ocaml/stdlib/ocaml_compiler_internal_params".
+# Copy this to install directory of stage0 to make it available
+# to the build of the compiler itself in stage0 (instead of patching the
+# upstream compiler to look for it in the right place).
 .PHONY: stage0
 stage0: _build0/config.status
 	rm -f .rsync-output
@@ -38,9 +44,10 @@ stage0: _build0/config.status
 	  $$(pwd)/ocaml/ $$(pwd)/_build0 \
 	  | grep -v '/$$' \
 	  | tee .rsync-output
-	if [ -s .rsync-output ] || ! [ -d @stage0_prefix@ ]; then \
+	if [ -s .rsync-output ] || ! [ -d @stage0_prefix@/bin ]; then \
 	  (cd _build0 && \
-	    export OCAMLPARAM=$${OCAMLPARAM:+can-discard=ocamlcfg,$$OCAMLPARAM} && \
+	    mkdir -p $(stage0_prefix)/lib/ocaml && \
+	    cp ../ocaml/stdlib/ocaml_compiler_internal_params $(stage0_prefix)/lib/ocaml/ && \
 	    $(MAKE) world.opt && \
 	    $(MAKE) ocamlnat && \
 	    $(MAKE) install); \
