@@ -247,16 +247,14 @@
   optcompile
   optmaindriver
   compiler_hooks
-  flambda_backend_args
   ;; printer/
   printast_with_mappings
   location_tracker_formatter
   ;; utils/
-  flambda_backend_flags
   ; The driver should be in here too, but is not at present.  This might
   ; be tricky because it has a different name...
   )
- (libraries ocamlcommon stdlib flambda2_identifiers flambda2_cmx))
+ (libraries flambda_backend_common ocamlcommon stdlib flambda2_identifiers flambda2_cmx))
 
 (executable
  (name flambda_backend_optmain)
@@ -281,6 +279,7 @@
   flambda2_ui
   flambda2_to_cmm
   ocamloptcomp
+  flambda_backend_common
   ocamlcommon
   stdlib)
  (modules flambda_backend_optmain))
@@ -302,6 +301,7 @@
   flambda2_ui
   flambda2_to_cmm
   ocamloptcomp
+  flambda_backend_common
   ocamlcommon
   stdlib
   runtime_native)
@@ -320,9 +320,9 @@
    -warn-error A -bin-annot -safe-string -strict-formats
    -cclib "-I runtime" -cclib "-L runtime" -cclib -lcamlrun
  ))
- (link_deps (file stdlib/camlheader) (file runtime/libcamlrun.a))
- (libraries ocamlbytecomp ocamlcommon stdlib)
- (modules main))
+ (link_deps (file ocaml/stdlib/camlheader) (file ocaml/runtime/libcamlrun.a))
+ (libraries ocamlbytecomp flambda_backend_common ocamlcommon stdlib)
+ (modules flambda_backend_main))
 
 (rule
  (targets flambda_backend_main_native.ml)
@@ -336,8 +336,8 @@
    -nostdlib -strict-sequence -principal -absname -w +a-4-9-40-41-42-44-45-48-66
    -warn-error A -bin-annot -safe-string -strict-formats
  ))
- (libraries ocamlbytecomp ocamlcommon runtime_native stdlib)
- (modules main_native))
+ (libraries ocamlbytecomp flambda_backend_common ocamlcommon runtime_native stdlib)
+ (modules flambda_backend_main_native))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
 ; must be kept in sync with each other and in a topological order.

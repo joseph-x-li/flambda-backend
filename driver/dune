@@ -7,3 +7,18 @@
   (:include %{project_root}/ocamlopt_flags.sexp))
  (libraries stdlib ocamloptcomp flambda2)
  (modules optcompile))
+
+(library
+ (name flambda_backend_common)
+ (modes byte native)
+ ; same as ocamlcommon library
+ (flags (
+   -nostdlib -strict-sequence -principal -absname -w +a-4-9-40-41-42-44-45-48-66
+   -warn-error A -bin-annot -safe-string -strict-formats
+   -w -67
+   ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
+ ))
+ (ocamlopt_flags
+  (:include %{project_root}/ocamlopt_flags.sexp))
+ (libraries stdlib ocamlcommon)
+ (modules flambda_backend_args flambda_backend_flags))
