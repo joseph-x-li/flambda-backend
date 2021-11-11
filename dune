@@ -36,7 +36,7 @@
 
 (copy_files# driver/flambda_backend_args.ml{,i})
 
-(copy_files# utils/flambda_backend_flags.ml{,i})
+(copy_files# driver/flambda_backend_flags.ml{,i})
 
 (copy_files# file_formats/cmx_format.mli)
 
