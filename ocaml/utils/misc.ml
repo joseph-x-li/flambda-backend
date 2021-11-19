@@ -998,7 +998,7 @@ module Magic_number = struct
 
        We accept them here, but will always produce/show kind prefixes
        that follow the current convention, Caml1999{D,T}. *)
-    | "Caml2007D" | "Caml1999D" -> Some Cmxs
+    | "Caml2007D" | "Caml1999D" | "Caml2021D" -> Some Cmxs
     | "Caml2012T" | "Caml1999T" -> Some Cmt
 
     | "Caml1999M" -> Some Ast_impl
