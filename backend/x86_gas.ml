@@ -335,6 +335,7 @@ let print_line b = function
     -> assert false
 
 let generate_asm oc lines =
+  Profile.record_call "x86_gas_generate_asm" (fun () ->
   let b = Buffer.create 10000 in
   output_string oc "\t.file \"\"\n"; (* PR#7037 *)
   List.iter
@@ -344,4 +345,4 @@ let generate_asm oc lines =
        Buffer.add_char b '\n';
        Buffer.output_buffer oc b;
     )
-    lines
+    lines)
