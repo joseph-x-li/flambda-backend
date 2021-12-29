@@ -292,6 +292,11 @@ let test_cfgize (f : Mach.fundecl) (res : Linear.fundecl) : unit =
       f.Mach.fun_name;
   end
 
+let per_function =
+  match Sys.getenv_opt "OCAML_DUMP_PROFILE_PER_FUNCTION" with
+  | Some "1" -> true
+  | Some _ | None -> false
+
 let compile_fundecl ~ppf_dump fd_cmm =
   Proc.init ();
   Reg.reset();
@@ -355,7 +360,9 @@ let compile_data dl =
 let compile_phrase ~ppf_dump p =
   if !dump_cmm then fprintf ppf_dump "%a@." Printcmm.phrase p;
   match p with
-  | Cfunction fd -> compile_fundecl ~ppf_dump fd
+  | Cfunction fd ->
+    let f () = compile_fundecl ~ppf_dump fd in
+    if per_function then Profile.record_call fd.fun_name f else f ()
   | Cdata dl -> compile_data dl
 
 
