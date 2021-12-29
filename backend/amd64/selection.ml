@@ -85,6 +85,7 @@ let rec select_addr exp =
       end
   | _ -> default
 
+(* Copy of Mach.equal_operand to avoid cyclic dependency. Keep in sync. *)
 let equal_operand left right =
   match left, right with
   | Iimm left, Iimm right -> Targetint.equal left right
