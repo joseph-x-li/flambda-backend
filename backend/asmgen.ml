@@ -133,7 +133,108 @@ let emit_fundecl =
   if_emit_do
     (Profile.record ~accumulate:true "emit" Emit.fundecl)
 
-let rec regalloc ~ppf_dump round fd =
+let dump_regalloc_stats =
+  match Sys.getenv_opt "OCAML_DUMP_REGALLOC_STATS" with
+  | Some "1" -> true
+  | Some _ | None -> false
+
+let regalloc_stats ppf (fd : Mach.fundecl) =
+  (* Collect stats *)
+  let num_regs = Reg.num_registers () in
+  let used_regs = ref Reg.Set.empty in
+  let max_live = ref 0 in
+  let max_live_across_calls = ref 0 in
+  let max_live_across_direct_calls = ref 0 in
+  let indirect_calls = ref 0 in
+  let direct_calls = ref 0 in
+  let ext_calls = ref 0 in
+  let direct_call_targets = ref [] in
+  (* Compute max number of live registers associated with
+     any program point in the function.  *)
+  let rec traverse (i : Mach.instruction) =
+    let update r =
+      r := max !r (Reg.Set.cardinal i.live)
+    in
+    update max_live;
+    used_regs := Reg.add_set_array !used_regs i.arg;
+    used_regs := Reg.add_set_array !used_regs i.res;
+    match i.desc with
+    | Iend | Ireturn _ | Iraise _ | Iexit _ -> ()
+    | Iop op ->
+      (match op with
+       | Icall_imm { func } ->
+         incr direct_calls;
+         if not (List.mem func !direct_call_targets) then
+           direct_call_targets := func::!direct_call_targets;
+         update max_live_across_direct_calls;
+         update max_live_across_calls
+       | Icall_ind ->
+         incr indirect_calls;
+         update max_live_across_calls
+       | Iextcall _ ->
+         incr ext_calls;
+         update max_live_across_calls
+       | _ -> ());
+      traverse i.next
+    | Iifthenelse (_,ifso,ifnot) ->
+      traverse ifso;
+      traverse ifnot;
+      traverse i.next
+    | Iswitch (_, cases) ->
+      Array.iter traverse cases;
+      traverse i.next
+    | Icatch (_,_,handlers,body) ->
+      List.iter (fun (_,_,h) -> traverse h) handlers;
+      traverse body;
+      traverse i.next
+    | Itrywith (body,_,(_,handler)) ->
+      traverse body;
+      traverse handler;
+      traverse i.next
+  in
+  traverse fd.fun_body;
+  (* Print stats *)
+  fprintf ppf "@[<h>*** Regalloc: ";
+  let record name value =
+    Profile.record_counter ~accumulate:true ~counter_accumulator:max name value;
+    fprintf ppf "%s=%d, " name value
+  in
+  record "num_regs" num_regs;
+  record "used_regs" (Reg.Set.cardinal !used_regs);
+  record "max_live" !max_live;
+  record "max_live_across_calls" !max_live_across_calls;
+  record "max_live_across_direct_calls" !max_live_across_direct_calls;
+  record "indirect_calls" !indirect_calls;
+  record "ext_calls" !ext_calls;
+  record "direct_calls" !direct_calls;
+  fprintf ppf "fun_name=%s@]@\n" fd.fun_name;
+  if !indirect_calls = 0 && !direct_calls > 0 then
+    List.iter (fun name ->
+      fprintf ppf "@[<h>*** Regalloc: direct call %s,%s@]@\n"
+        fd.fun_name name) !direct_call_targets
+
+let count_spills ppf (fd : Linear.fundecl) =
+  if dump_regalloc_stats then begin
+    let spills = ref 0 in
+    let reg_to_stack_move = ref 0 in
+    let rec iter (i : Linear.instruction) =
+      match i.desc with
+      | Lend ->
+        fprintf ppf "@[<h>*** Spills: spill=%d, reg_to_stack_move=%d, "
+          !spills !reg_to_stack_move ;
+        Array.iteri (fun i d -> fprintf ppf "stack_slots_%d=%d, " i d)
+          fd.fun_num_stack_slots;
+        fprintf ppf "fun_name=%s@]@\n" fd.fun_name
+      | Lop (Ispill) -> incr spills; iter i.next
+      | Lop (Imove) when Reg.is_stack i.res.(0) && Reg.is_reg i.arg.(0) ->
+        incr reg_to_stack_move; iter i.next
+      | _ -> iter i.next
+    in iter fd.fun_body;
+  end
+
+let rec regalloc ~ppf_dump round (fd : Mach.fundecl) =
+  if dump_regalloc_stats && round = 1 then regalloc_stats ppf_dump fd;
+
   if round > 50 then
     fatal_error(fd.Mach.fun_name ^
                 ": function too complex, cannot complete register allocation");
@@ -221,6 +322,7 @@ let compile_fundecl ~ppf_dump fd_cmm =
   ++ Profile.record ~accumulate:true "available_regs" Available_regs.fundecl
   ++ Profile.record ~accumulate:true "linearize" (fun (f : Mach.fundecl) ->
       let res = Linearize.fundecl f in
+      count_spills ppf_dump res;
       (* CR xclerc for xclerc: temporary, for testing. *)
       if !Flambda_backend_flags.use_ocamlcfg then begin
         test_cfgize f res;
