@@ -20,6 +20,20 @@ type file = string
 external time_include_children: bool -> float = "caml_sys_time_include_children"
 let cpu_time () = time_include_children true
 
+let format_csv =
+  match Sys.getenv_opt "OCAML_DUMP_PROFILE_FORMAT" with
+  | Some "csv" -> true
+  | Some _ | None -> false
+
+let separator = if format_csv then "," else " "
+let indent = if format_csv then "" else "  "
+let display_units = not format_csv
+let display_name ~parent_name ~name =
+  if format_csv && not (String.equal parent_name "") then
+    parent_name^":"^name
+  else
+    name
+
 module Measure = struct
   type t = {
     time : float;
@@ -118,6 +132,11 @@ type display = {
   worth_displaying : max:float -> bool;
 }
 
+let display_value_with_unit get_value ~width ~unit =
+  let unit_str = if display_units then unit else "" in
+  let width = width - (String.length unit_str) in
+  (get_value ~width) ^ unit_str
+
 let counter_display v : display =
   let to_string ~max:_ ~width = Printf.sprintf "%0*d" width v in
   let worth_displaying ~max:_ = not (Int.equal v 0) in
@@ -128,7 +147,7 @@ let time_display v : display =
      the first element of each row, we can't pad them with spaces. *)
   let to_string_without_unit v ~width = Printf.sprintf "%0*.03f" width v in
   let to_string ~max:_ ~width =
-    to_string_without_unit v ~width:(width - 1) ^ "s" in
+    display_value_with_unit (to_string_without_unit v) ~width ~unit:"s" in
   let worth_displaying ~max:_ =
     float_of_string (to_string_without_unit v ~width:0) <> 0. in
   { to_string; worth_displaying }
@@ -169,8 +188,7 @@ let memory_word_display =
   fun ?previous v : display ->
     let to_string ~max ~width =
       let scale, scale_str = choose_memory_scale max in
-      let width = width - String.length scale_str in
-      to_string_without_unit v ~width scale ^ scale_str
+      display_value_with_unit (to_string_without_unit v scale) ~width ~unit:scale_str
     in
     let worth_displaying ~max =
       let scale, _ = choose_memory_scale max in
@@ -310,18 +328,21 @@ let display_rows ppf rows =
                   else String.make width '-'
   in
   let widths = width_by_column ~n_columns ~display_cell rows in
-  let rec loop (R (name, values, rows)) ~indentation =
+  let rec loop (R (name, values, rows)) ~indentation ~parent_name =
     let worth_displaying, cell_strings =
       values
       |> List.mapi (fun i cell -> display_cell i cell ~width:widths.(i))
       |> List.split
     in
-    if List.exists (fun b -> b) worth_displaying then
-      Format.fprintf ppf "%s%s %s@\n"
-        indentation (String.concat " " cell_strings) name;
-    List.iter (loop ~indentation:("  " ^ indentation)) rows;
+    let display_name = display_name ~parent_name ~name in
+    if format_csv || List.exists (fun b -> b) worth_displaying then
+      Format.fprintf ppf "%s%s%s%s@\n"
+        indentation (String.concat separator cell_strings)
+        separator display_name;
+    List.iter (loop ~indentation:(indent ^ indentation) ~parent_name:display_name)
+      rows;
   in
-  List.iter (loop ~indentation:"") rows
+  List.iter (loop ~indentation:"" ~parent_name:"") rows
 
 let column_mapping = [
   `Time, "time";
@@ -341,8 +362,19 @@ let print ppf columns =
        | None -> Measure.zero
      in
      let total = Measure_diff.of_diff Measure.zero (Measure.create ()) in
-     display_rows ppf
-       (rows_of_hierarchy !hierarchy total initial_measure columns)
+     let rows = rows_of_hierarchy !hierarchy total initial_measure columns in
+     if format_csv then begin
+       (* Print header if rows are not empty, even if there is nothing
+          worth displaying. *)
+       match rows with
+       | [] -> ()
+       | _ ->
+         columns
+         |> List.map (fun c -> List.assoc c column_mapping)
+         |> String.concat separator
+         |> Format.fprintf ppf "%s,name\n"
+     end;
+     display_rows ppf rows
 
 let column_names = List.map snd column_mapping
 
