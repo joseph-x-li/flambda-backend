@@ -136,6 +136,11 @@ let main argv ppf =
     Location.report_exception ppf x;
     2
   | () ->
-      Compmisc.with_ppf_dump ~file_prefix:"profile"
+    let file_prefix =
+    match !output_name with
+      | None -> "profile"
+      | Some t -> t^".profile"
+    in
+      Compmisc.with_ppf_dump ~file_prefix
         (fun ppf -> Profile.print ppf !Clflags.profile_columns);
       0

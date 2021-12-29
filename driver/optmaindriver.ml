@@ -158,5 +158,11 @@ let main argv ppf ~flambda2 =
     Location.report_exception ppf x;
     2
   | () ->
-    Profile.print Format.std_formatter !Clflags.profile_columns;
-    0
+    let file_prefix =
+    match !output_name with
+      | None -> "profile"
+      | Some t -> t^".profile"
+    in
+      Compmisc.with_ppf_dump ~file_prefix
+        (fun ppf -> Profile.print ppf !Clflags.profile_columns);
+      0
