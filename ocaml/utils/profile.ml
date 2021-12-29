@@ -300,6 +300,13 @@ let display_rows ppf rows =
   in
   List.iter (loop ~indentation:"") rows
 
+let column_mapping = [
+  `Time, "time";
+  `Alloc, "alloc";
+  `Top_heap, "top-heap";
+  `Abs_top_heap, "absolute-top-heap";
+]
+
 let print ppf columns =
   match columns with
   | [] -> ()
@@ -313,14 +320,7 @@ let print ppf columns =
      display_rows ppf
        (rows_of_hierarchy !hierarchy total initial_measure columns)
 
-let column_mapping = [
-  "time", `Time;
-  "alloc", `Alloc;
-  "top-heap", `Top_heap;
-  "absolute-top-heap", `Abs_top_heap;
-]
-
-let column_names = List.map fst column_mapping
+let column_names = List.map snd column_mapping
 
 let options_doc =
   Printf.sprintf
@@ -328,7 +328,7 @@ let options_doc =
    \n    The columns are: %s."
     (String.concat " " column_names)
 
-let all_columns = List.map snd column_mapping
+let all_columns = List.map fst column_mapping
 
 let generate = "generate"
 let transl = "transl"
