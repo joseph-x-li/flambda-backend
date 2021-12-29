@@ -25,15 +25,17 @@ module Measure = struct
     time : float;
     allocated_words : float;
     top_heap_words : int;
+    counter : int;
   }
-  let create () =
+  let create ?(counter=0) () =
     let stat = Gc.quick_stat () in
     {
       time = cpu_time ();
       allocated_words = stat.minor_words +. stat.major_words;
       top_heap_words = stat.top_heap_words;
+      counter;
     }
-  let zero = { time = 0.; allocated_words = 0.; top_heap_words = 0 }
+  let zero = { time = 0.; allocated_words = 0.; top_heap_words = 0; counter = 0 }
 end
 
 module Measure_diff = struct
@@ -43,23 +45,28 @@ module Measure_diff = struct
     duration : float;
     allocated_words : float;
     top_heap_words_increase : int;
+    counter_increase : int;
   }
   let zero () = {
     timestamp = timestamp ();
     duration = 0.;
     allocated_words = 0.;
     top_heap_words_increase = 0;
+    counter_increase = 0;
   }
-  let accumulate t (m1 : Measure.t) (m2 : Measure.t) = {
+  let accumulate ?(counter_accumulator=( + ))
+        t (m1 : Measure.t) (m2 : Measure.t) = {
     timestamp = t.timestamp;
     duration = t.duration +. (m2.time -. m1.time);
     allocated_words =
       t.allocated_words +. (m2.allocated_words -. m1.allocated_words);
     top_heap_words_increase =
       t.top_heap_words_increase + (m2.top_heap_words - m1.top_heap_words);
+    counter_increase = counter_accumulator t.counter_increase
+                         (m2.counter - m1.counter);
   }
-  let of_diff m1 m2 =
-    accumulate (zero ()) m1 m2
+  let of_diff ?counter_accumulator m1 m2 =
+    accumulate ?counter_accumulator (zero ()) m1 m2
 end
 
 type hierarchy =
@@ -71,7 +78,8 @@ let hierarchy = ref (create ())
 let initial_measure = ref None
 let reset () = hierarchy := create (); initial_measure := None
 
-let record_call ?(accumulate = false) name f =
+let record_call ?counter ?(accumulate = false)
+      ?counter_accumulator name f =
   let E prev_hierarchy = !hierarchy in
   let start_measure = Measure.create () in
   if !initial_measure = None then initial_measure := Some start_measure;
@@ -92,17 +100,28 @@ let record_call ?(accumulate = false) name f =
   Misc.try_finally f
     ~always:(fun () ->
         hierarchy := E prev_hierarchy;
-        let end_measure = Measure.create () in
+        let end_measure = Measure.create ?counter () in
         let measure_diff =
-          Measure_diff.accumulate this_measure_diff start_measure end_measure in
+          Measure_diff.accumulate ?counter_accumulator
+            this_measure_diff start_measure end_measure in
         Hashtbl.add prev_hierarchy name (measure_diff, E this_table))
 
 let record ?accumulate pass f x = record_call ?accumulate pass (fun () -> f x)
+
+let record_counter ?accumulate ?counter_accumulator
+      counter_name counter =
+  record_call ?accumulate ?counter_accumulator ~counter counter_name
+    (fun () -> ())
 
 type display = {
   to_string : max:float -> width:int -> string;
   worth_displaying : max:float -> bool;
 }
+
+let counter_display v : display =
+  let to_string ~max:_ ~width = Printf.sprintf "%0*d" width v in
+  let worth_displaying ~max:_ = not (Int.equal v 0) in
+  { to_string; worth_displaying }
 
 let time_display v : display =
   (* Because indentation is meaningful, and because the durations are
@@ -182,12 +201,13 @@ let compute_other_category (E table : hierarchy) (total : Measure_diff.t) =
       allocated_words = p1.allocated_words -. p2.allocated_words;
       top_heap_words_increase =
         p1.top_heap_words_increase - p2.top_heap_words_increase;
+      counter_increase = 0;  (* not comparable *)
     }
   ) table;
   !r
 
 type row = R of string * (float * display) list * row list
-type column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap ]
+type column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counter ]
 
 let rec rows_of_hierarchy ~nesting make_row name measure_diff hierarchy env =
   let rows =
@@ -246,6 +266,9 @@ let rows_of_hierarchy hierarchy measure_diff initial_measure columns =
         | `Abs_top_heap ->
           make (float_of_int top_heap_words)
            ~f:(memory_word_display ~previous:(float_of_int prev_top_heap_words))
+        | `Counter ->
+          let n = p.counter_increase in
+          (float_of_int n), (counter_display n)
       ) columns,
       top_heap_words
   in
@@ -305,6 +328,7 @@ let column_mapping = [
   `Alloc, "alloc";
   `Top_heap, "top-heap";
   `Abs_top_heap, "absolute-top-heap";
+  `Counter, "counter"
 ]
 
 let print ppf columns =

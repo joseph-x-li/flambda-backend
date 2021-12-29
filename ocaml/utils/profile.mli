@@ -25,13 +25,20 @@ type file = string
 val reset : unit -> unit
 (** erase all recorded profile information *)
 
-val record_call : ?accumulate:bool -> string -> (unit -> 'a) -> 'a
+val record_call : ?counter:int -> ?accumulate:bool ->
+  ?counter_accumulator:(int -> int -> int) ->
+  string -> (unit -> 'a) -> 'a
 (** [record_call pass f] calls [f] and records its profile information. *)
 
 val record : ?accumulate:bool -> string -> ('a -> 'b) -> 'a -> 'b
 (** [record pass f arg] records the profile information of [f arg] *)
 
-type column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap ]
+val record_counter : ?accumulate:bool ->
+  ?counter_accumulator:(int -> int -> int) ->
+  string -> int -> unit
+(** [record counter v] records the [value] of named [counter] *)
+
+type column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counter ]
 
 val print : Format.formatter -> column list -> unit
 (** Prints the selected recorded profiling information to the formatter. *)
