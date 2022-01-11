@@ -315,7 +315,7 @@ let compile_fundecl ~ppf_dump fd_cmm =
   ++ Profile.record ~accumulate:true "deadcode" Deadcode.fundecl
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Mach_live
   ++ pass_dump_if ppf_dump dump_live "Liveness analysis"
-  ++ Profile.record ~accumulate:true "spill" Spill.fundecl
+  (* ++ Profile.record ~accumulate:true "spill" Spill.fundecl *)
   ++ Profile.record ~accumulate:true "liveness" liveness
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Mach_spill
   ++ pass_dump_if ppf_dump dump_spill "After spilling"
