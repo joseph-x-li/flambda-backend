@@ -2832,6 +2832,12 @@ let transl_builtin name args dbg =
     mulhi ~signed:true Pint64 args dbg
   | "caml_unsigned_int64_mulh_unboxed" ->
     mulhi ~signed:false Pint64 args dbg
+  | "caml_int32_bswap32_unsigned_unboxed_to_unboxed"
+  | "caml_int_bswap32_unsigned_untagged_to_untagged" ->
+    let op = Cbswap { bitwidth = 32 } in
+    if_operation_supported op ~f:(fun () ->
+      let arg = zero_extend_32 dbg (one_arg name args) in
+      Cop(op, [arg], dbg))
   (* Native_pointer: handled as unboxed nativeint *)
   | "caml_ext_pointer_as_native_pointer" ->
     Some(int_as_pointer (one_arg name args) dbg)
