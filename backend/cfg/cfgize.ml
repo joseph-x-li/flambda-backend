@@ -349,19 +349,6 @@ let can_raise_instr : Cfg.basic Cfg.instruction -> bool =
 let can_raise_instrs : Cfg.basic Cfg.instruction list -> bool =
  fun instrs -> List.exists can_raise_instr instrs
 
-let is_noop_move (instr : Cfg.basic Cfg.instruction) : bool =
-  match instr.Cfg.desc with
-  | Op (Move | Spill | Reload) ->
-    (* CR xclerc for xclerc: is testing the location enough? *)
-    Reg.same_loc instr.Cfg.arg.(0) instr.Cfg.res.(0)
-  | Op
-      ( Const_int _ | Const_float _ | Const_symbol _ | Stackoffset _ | Load _
-      | Store _ | Intop _ | Intop_imm _ | Negf | Absf | Addf | Subf | Mulf
-      | Divf | Compf _ | Floatofint | Intoffloat | Probe _ | Opaque
-      | Probe_is_enabled _ | Specific _ | Name_for_debugger _ )
-  | Call _ | Reloadretaddr | Pushtrap _ | Poptrap | Prologue ->
-    false
-
 let rec get_end : Mach.instruction -> Mach.instruction =
  fun instr ->
   match instr.Mach.desc with
@@ -395,9 +382,7 @@ let extract_block_info : State.t -> Mach.instruction -> block_info =
       match basic_or_terminator_of_operation state op with
       | Basic desc ->
         let instr' = copy_instruction state instr ~desc in
-        if is_noop_move instr'
-        then loop instr.next acc
-        else loop instr.next (instr' :: acc)
+        loop instr.next (instr' :: acc)
       | Terminator terminator ->
         return
           (Some (copy_instruction state instr ~desc:terminator))
