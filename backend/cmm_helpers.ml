@@ -593,10 +593,41 @@ let safe_mod_bi is_safe =
 
 (* Bool *)
 
+let simplify_test cmm =
+  let mk_cmpi cond c d ~swap dbg =
+    let args =
+      if swap then
+        [(Cconst_int (d, dbg)); c]
+      else
+        [c; (Cconst_int (d, dbg))]
+    in
+    if !Clflags.inlining_report then
+      Printf.printf "Cmm_helpers.simplify_test!!\n";
+    Cop(Ccmpi cond, args, dbg)
+  in
+  let simplify_cmpi cond arg k ~swap dbg =
+    match arg with
+    | Cop(Caddi, [c; Cconst_int(n,_)], _) when Misc.no_overflow_sub k n ->
+      mk_cmpi cond c (k - n) ~swap dbg
+    | Cop(Caddi, [Cconst_int(n,_); c], _) when Misc.no_overflow_sub k n ->
+      mk_cmpi cond c (k - n) ~swap dbg
+    | Cop(Csubi, [c; Cconst_int(n,_)], _) when Misc.no_overflow_add n k ->
+      mk_cmpi cond c (k + n) ~swap dbg
+    | Cop(Csubi, [Cconst_int(n,_); c], _) when Misc.no_overflow_sub n k ->
+      mk_cmpi cond c (k + n) ~swap:(not swap) dbg
+    | _ -> cmm
+  in
+  match cmm with
+  | Cop(Ccmpi cond, [arg1; Cconst_int (k, _)], dbg) ->
+    simplify_cmpi cond arg1 k ~swap:false dbg
+  | Cop(Ccmpi cond, [Cconst_int (k, _); arg2], dbg) ->
+    simplify_cmpi cond arg2 k ~swap:true dbg
+  | _ -> cmm
+
 let test_bool dbg cmm =
   match cmm with
   | Cop(Caddi, [Cop(Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
-      c
+    simplify_test c
   | Cconst_int (n, dbg) ->
       if n = 1 then
         Cconst_int (0, dbg)
