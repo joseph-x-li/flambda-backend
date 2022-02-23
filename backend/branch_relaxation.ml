@@ -24,7 +24,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
       match instr.desc with
       | Lend -> (pc, map)
       | Llabel lbl -> Hashtbl.add map lbl pc; fill_map pc instr.next
-      | op -> fill_map (pc + T.instr_size op) instr.next
+      | op -> fill_map (pc + T.instr_size instr.arg op) instr.next
     in
     fill_map 0 code
 
@@ -82,18 +82,18 @@ module Make (T : Branch_relaxation_intf.S) = struct
           instr_overflows ~code_size ~max_out_of_line_code_offset instr map pc
         in
         if not overflows then
-          fixup did_fix (pc + T.instr_size instr.desc) instr.next
+          fixup did_fix (pc + T.instr_size instr.arg instr.desc) instr.next
         else
           match instr.desc with
           | Lop (Ialloc { bytes = num_bytes; dbginfo }) ->
             instr.desc <- T.relax_allocation ~num_bytes ~dbginfo;
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr.arg instr.desc) instr.next
           | Lop (Iintop (Icheckbound)) ->
             instr.desc <- T.relax_intop_checkbound ();
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr.arg instr.desc) instr.next
           | Lop (Ispecific specific) ->
             instr.desc <- T.relax_specific_op specific;
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr.arg instr.desc) instr.next
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label() in
             let cont =
@@ -102,7 +102,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
             in
             instr.desc <- Lcondbranch (invert_test test, lbl2);
             instr.next <- cont;
-            fixup true (pc + T.instr_size instr.desc) instr.next
+            fixup true (pc + T.instr_size instr.arg instr.desc) instr.next
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
             let cont =
               expand_optbranch lbl0 0 instr.arg

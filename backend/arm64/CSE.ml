@@ -24,11 +24,11 @@ class cse = object
 
 inherit cse_generic as super
 
-method! class_of_operation op =
+method! class_of_operation op operands  =
   match op with
   | Ispecific(Ishiftcheckbound _) -> Op_checkbound
   | Ispecific _ -> Op_pure
-  | _ -> super#class_of_operation op
+  | _ -> super#class_of_operation op operands
 
 method! is_cheap_operation op =
   match op with

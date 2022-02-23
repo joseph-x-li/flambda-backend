@@ -109,15 +109,15 @@ class selector = object(self)
 
 inherit Selectgen.selector_generic as super
 
-method is_immediate_test _cmp n =
+method is_immediate_test_int _cmp n =
   is_immediate n
 
-method! is_immediate op n =
+method! is_immediate_int op n =
   match op with
-  | Iadd | Isub  -> n <= 0xFFF_FFF && n >= -0xFFF_FFF
-  | Iand | Ior | Ixor -> is_logical_immediate n
-  | Icomp _ | Icheckbound -> is_immediate n
-  | _ -> super#is_immediate op n
+  | Iintop (Iadd | Isub)  -> n <= 0xFFF_FFF && n >= -0xFFF_FFF
+  | Iintop (Iand | Ior | Ixor) -> is_logical_immediate n
+  | Iintop (Icomp _ | Icheckbound) -> is_immediate n
+  | _ -> super#is_immediate_int op n
 
 method! is_simple_expr = function
   (* inlined floating-point ops are simple if their arguments are *)
@@ -149,29 +149,33 @@ method select_addressing chunk = function
       (Iindexed 0, arg, 1)
 
 method! select_operation op args dbg =
+  let in_reg = Selectgen.Operands.in_registers () in
   match op with
   (* Integer addition *)
   | Caddi | Caddv | Cadda ->
       begin match args with
       (* Shift-add *)
       | [arg1; Cop(Clsl, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
-          (Ispecific(Ishiftarith(Ishiftadd, n)), [arg1; arg2])
+          (Ispecific(Ishiftarith(Ishiftadd, n)), [arg1; arg2], in_reg)
       | [arg1; Cop(Casr, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
-          (Ispecific(Ishiftarith(Ishiftadd, -n)), [arg1; arg2])
+          (Ispecific(Ishiftarith(Ishiftadd, -n)), [arg1; arg2], in_reg)
       | [Cop(Clsl, [arg1; Cconst_int (n, _)], _); arg2] when n > 0 && n < 64 ->
-          (Ispecific(Ishiftarith(Ishiftadd, n)), [arg2; arg1])
+          (Ispecific(Ishiftarith(Ishiftadd, n)), [arg2; arg1], in_reg)
       | [Cop(Casr, [arg1; Cconst_int (n, _)], _); arg2] when n > 0 && n < 64 ->
-          (Ispecific(Ishiftarith(Ishiftadd, -n)), [arg2; arg1])
+          (Ispecific(Ishiftarith(Ishiftadd, -n)), [arg2; arg1], in_reg)
       (* Multiply-add *)
-      | [arg1; Cop(Cmuli, args2, dbg)] | [Cop(Cmuli, args2, dbg); arg1] ->
-          begin match self#select_operation Cmuli args2 dbg with
-          | (Iintop_imm(Ilsl, l), [arg3]) ->
-              (Ispecific(Ishiftarith(Ishiftadd, l)), [arg1; arg3])
-          | (Iintop Imul, [arg3; arg4]) ->
-              (Ispecific Imuladd, [arg3; arg4; arg1])
-          | _ ->
-              super#select_operation op args dbg
-          end
+      | [arg1; Cop(Cmuli, [arg3;arg4], dbg)]
+      | [Cop(Cmuli, [arg3; arg4], dbg); arg1] ->
+        (Ispecific Imuladd, [arg3; arg4; arg1], in_reg)
+        (* CR gyorsh: [select_operation Cmuli] always returns Imul. *)
+          (* begin match self#select_operation Cmuli args2 dbg with
+           * | (Iintop_imm(Ilsl, l), [arg3]) ->
+           *     (Ispecific(Ishiftarith(Ishiftadd, l)), [arg1; arg3])
+           * | (Iintop Imul, [arg3; arg4]) ->
+           *     (Ispecific Imuladd, [arg3; arg4; arg1])
+           * | _ ->
+           *     super#select_operation op args dbg
+           * end *)
       | _ ->
           super#select_operation op args dbg
       end
@@ -180,19 +184,21 @@ method! select_operation op args dbg =
       begin match args with
       (* Shift-sub *)
       | [arg1; Cop(Clsl, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
-          (Ispecific(Ishiftarith(Ishiftsub, n)), [arg1; arg2])
+          (Ispecific(Ishiftarith(Ishiftsub, n)), [arg1; arg2], in_reg)
       | [arg1; Cop(Casr, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
-          (Ispecific(Ishiftarith(Ishiftsub, -n)), [arg1; arg2])
+          (Ispecific(Ishiftarith(Ishiftsub, -n)), [arg1; arg2], in_reg)
       (* Multiply-sub *)
-      | [arg1; Cop(Cmuli, args2, dbg)] ->
-          begin match self#select_operation Cmuli args2 dbg with
-          | (Iintop_imm(Ilsl, l), [arg3]) ->
-              (Ispecific(Ishiftarith(Ishiftsub, l)), [arg1; arg3])
-          | (Iintop Imul, [arg3; arg4]) ->
-              (Ispecific Imulsub, [arg3; arg4; arg1])
-          | _ ->
-              super#select_operation op args dbg
-          end
+      | [arg1; Cop(Cmuli, [arg3; arg4], dbg)] ->
+          (Ispecific Imulsub, [arg3; arg4; arg1], in_reg)
+          (* CR gyorsh: [select_operation Cmuli] always returns Imul. *)
+          (* begin match self#select_operation Cmuli args2 dbg with
+           * | (Iintop_imm(Ilsl, l), [arg3], _) ->
+           *     (Ispecific(Ishiftarith(Ishiftsub, l)), [arg1; arg3], in_reg)
+           * | (Iintop Imul, [arg3; arg4], _) ->
+           *     (Ispecific Imulsub, [arg3; arg4; arg1], in_reg)
+           * | _ ->
+           *     super#select_operation op args dbg
+           * end *)
       | _ ->
           super#select_operation op args dbg
       end
@@ -201,47 +207,49 @@ method! select_operation op args dbg =
       begin match args with
       | [Cop(Clsr, [arg1; Cconst_int (n, _)], _); arg2] when n > 0 && n < 64 ->
           (Ispecific(Ishiftcheckbound { shift = n; }),
-            [arg1; arg2])
+            [arg1; arg2], in_reg)
       | _ ->
           super#select_operation op args dbg
       end
   (* Recognize floating-point negate and multiply *)
   | Cnegf ->
       begin match args with
-      | [Cop(Cmulf, args, _)] -> (Ispecific Inegmulf, args)
+      | [Cop(Cmulf, args, _)] -> (Ispecific Inegmulf, args, in_reg)
       | _ -> super#select_operation op args dbg
       end
   (* Recognize floating-point multiply and add/sub *)
   | Caddf ->
       begin match args with
       | [arg; Cop(Cmulf, args, _)] | [Cop(Cmulf, args, _); arg] ->
-          (Ispecific Imuladdf, arg :: args)
+          (Ispecific Imuladdf, arg :: args, in_reg)
       | _ ->
           super#select_operation op args dbg
       end
   | Csubf ->
       begin match args with
       | [arg; Cop(Cmulf, args, _)] ->
-          (Ispecific Imulsubf, arg :: args)
+          (Ispecific Imulsubf, arg :: args, in_reg)
       | [Cop(Cmulf, args, _); arg] ->
-          (Ispecific Inegmulsubf, arg :: args)
+          (Ispecific Inegmulsubf, arg :: args, in_reg)
       | _ ->
           super#select_operation op args dbg
       end
   (* Recognize floating-point square root *)
   | Cextcall { func = "sqrt" } ->
-      (Ispecific Isqrtf, args)
+      (Ispecific Isqrtf, args, in_reg)
   (* Recognize bswap instructions *)
   | Cbswap { bitwidth } ->
     let bitwidth = select_bitwidth bitwidth in
-      (Ispecific(Ibswap { bitwidth }), args)
+      (Ispecific(Ibswap { bitwidth }), args, in_reg)
   (* Other operations are regular *)
   | _ ->
       super#select_operation op args dbg
 
 method! insert_move_extcall_arg env ty_arg src dst =
   if macosx && ty_arg = XInt32 && is_stack_slot dst
-  then self#insert env (Iop (Ispecific Imove32)) src dst
+  then
+     let src = Array.map (fun r -> Mach.Ireg r) src in
+     self#insert env (Iop (Ispecific Imove32)) src dst
   else self#insert_moves env src dst
 end
 

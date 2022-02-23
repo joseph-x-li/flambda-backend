@@ -22,18 +22,24 @@ class reload = object (self)
 
 inherit Reloadgen.reload_generic as super
 
-method! reload_operation op arg res operands =
+method! reload_operation op arg res =
   match op with
   | Ispecific Imove32 ->
       (* Like Imove: argument or result can be on stack but not both *)
-      begin match arg.(0), res.(0) with
-      | {loc = Stack s1}, {loc = Stack s2} when s1 <> s2 ->
-          ([| self#makereg arg.(0) |], res)
-      | _ ->
-          (arg, res)
+      begin match arg.(0) with
+        | Ireg r ->
+        begin match r.loc, res.(0).loc with
+          |  Stack s1, Stack s2 when s1 <> s2 ->
+          ([| Ireg (self#makereg r) |], res)
+          | _ -> (arg, res)
+        end
+        | Iimm _ | Iimmf _ -> (arg, res)
+        | Imem _ ->
+           Misc.fatal_errorf
+           "Reloadg.reload_operation: memory operand not supported."
       end
    | _ ->
-      super#reload_operation op arg res operands
+      super#reload_operation op arg res
 
 end
 

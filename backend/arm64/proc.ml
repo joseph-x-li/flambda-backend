@@ -263,15 +263,28 @@ let destroyed_at_c_call =
      116;117;118;119;120;121;122;123;
      124;125;126;127;128;129;130;131])
 
-let destroyed_at_oper = function
+let destroyed_at_oper op operands =
+  match op with
   | Iop(Icall_ind | Icall_imm _) | Iop(Iextcall { alloc = true; }) ->
       all_phys_regs
   | Iop(Iextcall { alloc = false; }) ->
       destroyed_at_c_call
   | Iop(Ialloc _) ->
       [| reg_x8 |]
-  | Iop(Iintoffloat | Ifloatofint | Iload(Single, _) | Istore(Single, _, _)) ->
+  | Iop(Iintoffloat | Ifloatofint | Iload(Single, _)) ->
       [| reg_d7 |]            (* d7 / s7 destroyed *)
+  | Iop(Istore _) ->
+    (match operands.(1) with
+     | Imem { chunk = Some Single } ->
+         [| reg_d7 |]            (* d7 / s7 destroyed *)
+     | Imem { chunk = None; }
+     | Imem { chunk = Some
+             (Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+             | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
+             | Double); } ->
+         [||]
+     | Iimm _ | Iimmf _ | Ireg _ ->
+         Misc.fatal_error "Proc.destroyed_at_oper Istore")
   | _ -> [||]
 
 let destroyed_at_raise = all_phys_regs
@@ -285,12 +298,30 @@ let safe_register_pressure = function
   | Ialloc _ -> 22
   | _ -> 23
 
-let max_register_pressure = function
+let max_register_pressure i =
+  match i.desc with
+  | Iop op ->
+  begin match op with
   | Iextcall _ -> [| 7; 8 |]  (* 7 integer callee-saves, 8 FP callee-saves *)
   | Ialloc _ -> [| 22; 32 |]
   | Iintoffloat | Ifloatofint
-  | Iload(Single, _) | Istore(Single, _, _) -> [| 23; 31 |]
+  | Iload(Single, _) -> [| 23; 31 |]
+  | Istore _ ->
+      (match i.arg.(1) with
+       | Imem { chunk = Some Single; } -> [| 23; 31 |]
+       | Imem { chunk = None; }
+       | Imem { chunk = Some
+             (Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+             | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
+             | Double); } -> [| 23; 32 |]
+       | Iimm _ | Iimmf _ | Ireg _ ->
+         Misc.fatal_error "Proc.max_register_pressure: Istore")
   | _ -> [| 23; 32 |]
+  end
+  | Iend | Ireturn _ | Iifthenelse (_, _, _) | Icatch (_, _, _, _)
+  | Iswitch _ | Itrywith (_, _, _)
+  | Iexit _ | Iraise _ ->
+    Misc.fatal_error "Proc.max_register_pressure: unexpected op"
 
 (* Pure operations (without any side effect besides updating their result
    registers). *)

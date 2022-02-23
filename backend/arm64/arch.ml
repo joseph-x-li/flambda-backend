@@ -1,3 +1,4 @@
+# 2 "backend/arm64/arch.ml"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -107,6 +108,34 @@ let int_of_bswap_bitwidth = function
   | Sixteen -> 16
   | Thirtytwo -> 32
   | Sixtyfour -> 64
+
+let print_specific_operation_name op =
+  match op with
+  | Ifar_alloc { bytes; } -> sprintf "(far) alloc %i" bytes
+  | Ifar_intop_checkbound -> "(far) check"
+  | Ishiftarith(op, shift) ->
+      let op_name = function
+      | Ishiftadd -> "+ "
+      | Ishiftsub -> "- " in
+      let shift_mark =
+       if shift >= 0
+       then sprintf "<< %i" shift
+       else sprintf ">> %i" (-shift)
+      in
+     (op_name op) ^ shift_mark
+  | Ishiftcheckbound { shift; } -> sprintf "check >> %i" shift
+  | Ifar_shiftcheckbound { shift; } -> sprintf "(far) check >> %i" shift
+  | Imuladd -> "muladd"
+  | Imulsub -> "mulsub"
+  | Inegmulf -> "negmulf"
+  | Imuladdf -> "muladdf"
+  | Inegmuladdf -> "negmuladdf"
+  | Imulsubf -> "mulsubf"
+  | Inegmulsubf -> "negmulsubf"
+  | Isqrtf -> "sqrtf %a"
+  | Ibswap { bitwidth } ->
+      sprintf "bswap%i" (int_of_bswap_bitwidth bitwidth)
+  | Imove32 -> "move32"
 
 let print_specific_operation printreg op ppf arg =
   match op with

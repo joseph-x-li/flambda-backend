@@ -21,6 +21,8 @@ let emit_string s = output_string !output_channel s
 
 let emit_int n = output_string !output_channel (Int.to_string n)
 
+let emit_targetint n = output_string !output_channel (Targetint.to_string n)
+
 let emit_char c = output_char !output_channel c
 
 let emit_nativeint n = output_string !output_channel (Nativeint.to_string n)
@@ -378,7 +380,7 @@ let create_asm_file = ref true
 
 let reduce_heap_size ~reset =
   let _minor, _promoted, major_words = Gc.counters () in
-  (* Uses [major_words] because it doesn't require a heap traversal to compute and 
+  (* Uses [major_words] because it doesn't require a heap traversal to compute and
      for this workload a majority of major words are live at this point. *)
   let heap_reduction_threshold =
     if !Flambda_backend_flags.heap_reduction_threshold >= 0 then
