@@ -256,7 +256,14 @@ let operation_can_raise = function
   | Ifar_intop_imm_checkbound _
   | Ishiftcheckbound _
   | Ifar_shiftcheckbound _ -> true
-  | _ -> false
-
-
->>>>>>> 2ef28ac192 (Refactor Proc.op_is_pure and fix Mach.operation_can_raise)
+  | Imuladd
+  | Imulsub
+  | Inegmulf
+  | Imuladdf
+  | Inegmuladdf
+  | Imulsubf
+  | Inegmulsubf
+  | Isqrtf
+  | Imove32
+  | Ishiftarith (_, _)
+  | Ibswap _ -> false
