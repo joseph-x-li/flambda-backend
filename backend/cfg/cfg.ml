@@ -352,14 +352,7 @@ let is_pure_operation : operation -> bool = function
   | Load _ -> true
   | Store _ -> false
   | Intop _ -> true
-  | Intop_imm _ -> true
-  | Negf -> true
-  | Absf -> true
-  | Addf -> true
-  | Subf -> true
-  | Mulf -> true
-  | Divf -> true
-  | Compf _ -> true
+  | Floatop _ -> true
   | Floatofint -> true
   | Intoffloat -> true
   | Probe _ -> false
@@ -387,15 +380,15 @@ let print_terminator oc ?sep ti =
 let is_noop_move instr =
   match instr.desc with
   | Op (Move | Spill | Reload) -> (
-    match instr.arg.(0).loc with
+    let r = Mach.arg_reg instr.arg.(0) in
+    match r.loc with
     | Unknown -> false
-    | Reg _ | Stack _ -> Reg.same_loc instr.arg.(0) instr.res.(0))
+    | Reg _ | Stack _ -> Reg.same_loc r instr.res.(0))
   | Op
       ( Const_int _ | Const_float _ | Const_symbol _ | Stackoffset _ | Load _
-      | Store _ | Intop _ | Intop_imm _ | Negf | Absf | Addf | Subf | Mulf
-      | Divf | Compf _ | Floatofint | Intoffloat | Probe _ | Opaque
-      | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Begin_region
-      | End_region )
+      | Store _ | Intop _ | Floatop _ | Floatofint | Intoffloat | Probe _
+      | Opaque | Probe_is_enabled _ | Specific _ | Name_for_debugger _
+      | Begin_region | End_region )
   | Call _ | Reloadretaddr | Pushtrap _ | Poptrap | Prologue ->
     false
 

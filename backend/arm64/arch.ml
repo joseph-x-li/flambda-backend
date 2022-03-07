@@ -254,7 +254,6 @@ let equal_specific_operation left right =
 let is_pure_specific : specific_operation -> bool = function
   | Ifar_alloc _ -> false
   | Ifar_intop_checkbound -> false
-  | Ifar_intop_imm_checkbound _ -> false
   | Ishiftarith _ -> true
   | Ishiftcheckbound _ -> false
   | Ifar_shiftcheckbound _ -> false

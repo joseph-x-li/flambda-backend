@@ -157,7 +157,7 @@ let basic_or_terminator_of_operation :
     else Terminator (Call_no_return external_call)
   | Istackoffset ofs -> Basic (Op (Stackoffset ofs))
   | Iload (mem, mode) -> Basic (Op (Load (mem, mode)))
-  | Istore { assignment; mode } -> Basic (Op (Store { assignment; mode }))
+  | Istore assignment -> Basic (Op (Store assignment))
   | Ialloc { bytes; dbginfo; mode } ->
     Basic (Call (P (Alloc { bytes; dbginfo; mode })))
   | Iintop Icheckbound -> Basic (Call (P Checkbound))
@@ -292,19 +292,6 @@ let copy_instruction_no_reg :
   let id = State.get_next_instruction_id state in
   let fdo = Fdo_info.none in
   { desc; arg; res; dbg; live; trap_depth; id; fdo }
-
-let is_noop_move (instr : Cfg.basic Cfg.instruction) : bool =
-  match instr.Cfg.desc with
-  | Op (Move | Spill | Reload) ->
-    (* CR xclerc for xclerc: is testing the location enough? *)
-    Reg.same_loc (Mach.arg_reg instr.Cfg.arg.(0)) instr.Cfg.res.(0)
-  | Op
-      ( Const_int _ | Const_float _ | Const_symbol _ | Stackoffset _ | Load _
-      | Store _ | Intop _ | Floatop _ | Floatofint | Intoffloat | Probe _
-      | Opaque | Probe_is_enabled _ | Specific _ | Name_for_debugger _
-      | Begin_region | End_region )
-  | Call _ | Reloadretaddr | Pushtrap _ | Poptrap | Prologue ->
-    false
 
 let rec get_end : Mach.instruction -> Mach.instruction =
  fun instr ->

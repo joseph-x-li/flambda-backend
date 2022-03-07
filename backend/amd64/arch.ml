@@ -331,13 +331,10 @@ let equal_specific_operation left right =
     false
 
 let is_pure_specific : specific_operation -> bool = function
-  | Ilea _ -> true
-  | Istore_int _ -> false
-  | Ioffset_loc _ -> false
-  | Ifloatarithmem _ -> false
+  | Ilea -> true
+  | Ioffset_loc  -> false
   | Ibswap _ -> true
   | Isqrtf -> true
-  | Ifloatsqrtf _ -> false
   | Ifloat_iround -> true
   | Ifloat_round _ -> true
   | Ifloat_min -> true

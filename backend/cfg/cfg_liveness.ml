@@ -37,8 +37,8 @@ module Transfer = struct
     | Op _ | Call _ ->
       if Cfg.is_pure_basic instr.desc
          && Reg.disjoint_set_array value instr.res
-         && (not (Proc.regs_are_volatile instr.arg))
-         && not (Proc.regs_are_volatile instr.res)
+         && (not (Proc.regs_are_volatile (Mach.arg_regset instr.arg)))
+         && not (Proc.regs_are_volatile (Reg.set_of_array instr.res))
       then value, Cfg.set_live instr value
       else
         let across = Reg.diff_set_array value instr.res in
@@ -47,7 +47,8 @@ module Transfer = struct
           then Reg.Set.union across exn
           else across
         in
-        Reg.add_set_array across instr.arg, Cfg.set_live instr across
+        ( Reg.Set.union across (Mach.arg_regset instr.arg),
+          Cfg.set_live instr across )
     | Reloadretaddr ->
       ( Reg.diff_set_array value Proc.destroyed_at_reloadretaddr,
         Cfg.set_live instr Reg.Set.empty )
@@ -61,25 +62,20 @@ module Transfer = struct
       Cfg.terminator Cfg.instruction ->
       domain * Cfg.terminator Cfg.instruction =
    fun value ~exn instr ->
+    let a = Mach.arg_regset instr.arg in
     match instr.desc with
     | Never -> assert false
-    | Always _ -> Reg.add_set_array value instr.arg, Cfg.set_live instr value
-    | Parity_test _ ->
-      Reg.add_set_array value instr.arg, Cfg.set_live instr value
-    | Truth_test _ ->
-      Reg.add_set_array value instr.arg, Cfg.set_live instr value
-    | Float_test _ ->
-      Reg.add_set_array value instr.arg, Cfg.set_live instr value
-    | Int_test _ -> Reg.add_set_array value instr.arg, Cfg.set_live instr value
-    | Switch _ -> Reg.add_set_array value instr.arg, Cfg.set_live instr value
-    | Return -> Reg.set_of_array instr.arg, Cfg.set_live instr Reg.Set.empty
-    | Tailcall (Self _) ->
-      Reg.set_of_array instr.arg, Cfg.set_live instr Reg.Set.empty
-    | Raise _ -> Reg.add_set_array exn instr.arg, Cfg.set_live instr exn
-    | Tailcall (Func _) ->
-      Reg.set_of_array instr.arg, Cfg.set_live instr Reg.Set.empty
-    | Call_no_return _ ->
-      Reg.add_set_array exn instr.arg, Cfg.set_live instr exn
+    | Always _ -> Reg.Set.union value a, Cfg.set_live instr value
+    | Parity_test _ -> Reg.Set.union value a, Cfg.set_live instr value
+    | Truth_test _ -> Reg.Set.union value a, Cfg.set_live instr value
+    | Float_test _ -> Reg.Set.union value a, Cfg.set_live instr value
+    | Int_test _ -> Reg.Set.union value a, Cfg.set_live instr value
+    | Switch _ -> Reg.Set.union value a, Cfg.set_live instr value
+    | Return -> a, Cfg.set_live instr Reg.Set.empty
+    | Tailcall (Self _) -> a, Cfg.set_live instr Reg.Set.empty
+    | Raise _ -> Reg.Set.union exn a, Cfg.set_live instr exn
+    | Tailcall (Func _) -> a, Cfg.set_live instr Reg.Set.empty
+    | Call_no_return _ -> Reg.Set.union exn a, Cfg.set_live instr exn
 
   let exception_ : domain -> domain =
    fun value -> Reg.Set.remove Proc.loc_exn_bucket value
