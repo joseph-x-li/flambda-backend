@@ -413,7 +413,7 @@ let max_register_pressure i =
              | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val
              | Double); } -> consumes ~int:0 ~float:0
        | Iimm _ | Iimmf _ | Ireg _ ->
-         Misc.fatal_error "Proc.destroyed_at_oper Istore")
+         Misc.fatal_error "Proc.max_register_pressure: Istore")
     | Iintop(Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
             | Ipopcnt|Iclz _| Ictz _|Icheckbound)
     | Imove | Ispill | Ireload
