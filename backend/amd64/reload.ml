@@ -75,11 +75,6 @@ class reload = object (self)
 
 inherit Reloadgen.reload_generic as super
 
-method private one_stack arg =
-  if stackp arg.(0) && stackp arg.(1)
-  then [|arg.(0); self#makereg arg.(1)|]
-  else arg
-
 method private one_mem_or_stack operands =
   (* First operand must be Ireg *)
   let r = Mach.arg_reg operands.(0) in
