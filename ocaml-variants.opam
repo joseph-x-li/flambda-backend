@@ -12,7 +12,7 @@ flags: compiler
 setenv: CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"
 build: [
   ["autoconf"]
-  ["./configure" "--prefix=%{prefix}%" "--enable-middle-end=closure"]
+  ["./configure" "--prefix=%{prefix}%" "--enable-middle-end=closure" "--with-dune=/Users/josephli/Github/compilers-dev/dune/dune.exe"]
   [make "-j%{jobs}%"]
 ]
 install: [make "install"]
